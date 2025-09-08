@@ -117,7 +117,7 @@ from pydantic_settings import BaseSettings
 from pydantic import AnyHttpUrl, PostgresDsn, RedisDsn
 
 class Settings(BaseSettings):
-    PROJECT_NAME: str = "Perky AI Assistant V2"
+    PROJECT_NAME: str = "Perky AI Assistant"
     VERSION: str = "2.0.0"
     API_V1_STR: str = "/api/v1"
 
@@ -152,7 +152,7 @@ settings = Settings()
 
 ```dockerfile
 # Dockerfile
-FROM python:3.11-slim
+FROM python:3.12-slim
 
 WORKDIR /app
 
