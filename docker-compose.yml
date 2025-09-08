@@ -1,0 +1,73 @@
+services:
+  app:
+    build: .
+    container_name: perky-api
+    ports:
+      - "8000:8000"
+    env_file:
+      - .env
+    environment:
+      - POSTGRES_SERVER=postgres
+      - POSTGRES_USER=perky_user
+      - POSTGRES_PASSWORD=perky_password
+      - POSTGRES_DB=perky_db
+      - REDIS_URL=redis://redis:6379/0
+      - PERKY_OS_API_URL=https://api.perkyos.com/v1
+      - PERKY_OS_JWT_SECRET=${PERKY_OS_JWT_SECRET}
+      - OPENAI_API_KEY=${OPENAI_API_KEY}
+      - OPENAI_MODEL=gpt-4o-mini
+    volumes:
+      - ./src:/app/src
+      - ./tests:/app/tests
+      - ./migrations:/app/migrations
+    depends_on:
+      - postgres
+      - redis
+    networks:
+      - perky-network
+
+  postgres:
+    image: postgres:16-alpine
+    container_name: perky-postgres
+    environment:
+      - POSTGRES_USER=perky_user
+      - POSTGRES_PASSWORD=perky_password
+      - POSTGRES_DB=perky_db
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./scripts/init-db.sql:/docker-entrypoint-initdb.d/init.sql
+    ports:
+      - "5432:5432"
+    networks:
+      - perky-network
+
+  redis:
+    image: redis:7-alpine
+    container_name: perky-redis
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+    networks:
+      - perky-network
+
+  pgadmin:
+    image: dpage/pgadmin4:latest
+    container_name: perky-pgadmin
+    environment:
+      - PGADMIN_DEFAULT_EMAIL=admin@smsperkasa.com
+      - PGADMIN_DEFAULT_PASSWORD=admin
+    ports:
+      - "5050:80"
+    depends_on:
+      - postgres
+    networks:
+      - perky-network
+
+volumes:
+  postgres_data:
+  redis_data:
+
+networks:
+  perky-network:
+    driver: bridge

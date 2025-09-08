@@ -1,0 +1,45 @@
+{
+  "default": true,
+  "MD022": {
+    "lines_above": 1,
+    "lines_below": 1
+  },
+  "MD031": {
+    "list_items": false
+  },
+  "MD032": {
+    "stern": true
+  },
+  "MD034": {
+    "no-bare-urls": true
+  },
+  "MD025": false,
+  "MD040": {
+    "allowed_languages": [
+      "",
+      "text",
+      "markdown",
+      "md",
+      "bash",
+      "python",
+      "javascript",
+      "typescript",
+      "json",
+      "yaml",
+      "dockerfile",
+      "sql",
+      "env"
+    ]
+  },
+  "MD047": {
+    "style": "newline"
+  },
+  "MD013": {
+    "line_length": 120,
+    "code_blocks": false,
+    "tables": false
+  },
+  "MD033": {
+    "allowed_elements": ["details", "summary", "br"]
+  }
+}
