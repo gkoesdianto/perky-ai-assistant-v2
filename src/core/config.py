@@ -5,11 +5,11 @@ from pydantic_core import MultiHostUrl
 
 
 class Settings(BaseSettings):
-    PROJECT_NAME: str = "Perky AI Assistant"
-    VERSION: str = "2.0.0"
-    API_V1_STR: str = "/api/v1"
+    PROJECT_NAME: str
+    VERSION: str
+    API_V1_STR: str
 
-    # CORS
+    # CORS - Allow Svelte widget to connect
     BACKEND_CORS_ORIGINS: List[AnyHttpUrl] = []
 
     # Database
@@ -40,13 +40,31 @@ class Settings(BaseSettings):
             path=postgres_db,
         )
 
-    # Redis
+    # Redis - For session management and caching
     REDIS_URL: RedisDsn
+    REDIS_SESSION_TTL: int  # 1 hour default in .env
+    REDIS_CACHE_TTL: int  # 15 minutes for price/stock default in .env
+
+    # PIM Integration
+    PERKY_OS_API_URL: str
+    PERKY_OS_JWT_SECRET: str
+    PERKY_OS_TIMEOUT: int  # milliseconds
+
+    # OpenAI for PydanticAI
+    OPENAI_API_KEY: str
+    OPENAI_MODEL: str
+    OPENAI_TEMPERATURE: float
+    OPENAI_MAX_RETRIES: int
+
+    # WebSocket
+    WS_HEARTBEAT_INTERVAL: int
+    WS_MAX_CONNECTIONS: int
+    WS_MESSAGE_RATE_LIMIT: int
 
     # Security
     SECRET_KEY: str
-    ALGORITHM: str = "HS256"
-    ACCESS_TOKEN_EXPIRE_MINUTES: int = 30
+    ALGORITHM: str
+    ACCESS_TOKEN_EXPIRE_MINUTES: int
 
     class Config:
         env_file = ".env"
