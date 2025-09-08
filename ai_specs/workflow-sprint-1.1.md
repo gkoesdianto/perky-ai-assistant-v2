@@ -49,29 +49,33 @@ touch requirements/prod.txt
 ### 1.3 Install Core Dependencies
 
 ```text
-fastapi==0.109.0
-uvicorn[standard]==0.27.0
-pydantic==2.5.3
-pydantic-settings==2.1.0
-sqlalchemy==2.0.25
-alembic==1.13.1
-asyncpg==0.29.0
-redis==5.0.1
-python-multipart==0.0.6
+# requirements/base.txt
+fastapi==0.115.5
+uvicorn[standard]==0.32.1
+pydantic==2.10.3
+pydantic-settings==2.6.1
+pydantic-ai==1.0.1
+sqlalchemy==2.0.36
+alembic==1.14.0
+asyncpg==0.30.0
+redis==5.2.0
+python-multipart==0.0.7
 python-jose[cryptography]==3.3.0
-passlib[bcrypt]==1.7.4
+httpx==0.27.2
+openai==1.57.0
 ```
 
 ```text
+# requirements/dev.txt
 -r base.txt
-pytest==7.4.4
-pytest-asyncio==0.23.3
-pytest-cov==4.1.0
-black==23.12.1
+pytest==8.3.4
+pytest-asyncio==0.24.0
+pytest-cov==6.0.0
+black==24.10.0
 isort==5.13.2
-flake8==7.0.0
-mypy==1.8.0
-pre-commit==3.6.0
+flake8==7.1.1
+mypy==1.13.0
+pre-commit==4.0.1
 ```
 
 ### 1.4 Create Main Application File
@@ -117,11 +121,11 @@ from pydantic_settings import BaseSettings
 from pydantic import AnyHttpUrl, PostgresDsn, RedisDsn
 
 class Settings(BaseSettings):
-    PROJECT_NAME: str = "Perky AI Assistant"
-    VERSION: str = "2.0.0"
+    PROJECT_NAME: str = "Steel Chat API"
+    VERSION: str = "1.0.0"
     API_V1_STR: str = "/api/v1"
 
-    # CORS
+    # CORS - Allow Svelte widget to connect
     BACKEND_CORS_ORIGINS: List[AnyHttpUrl] = []
 
     # Database
@@ -131,13 +135,26 @@ class Settings(BaseSettings):
     POSTGRES_DB: str
     DATABASE_URL: Optional[PostgresDsn] = None
 
-    # Redis
+    # Redis - For session management and caching
     REDIS_URL: RedisDsn
+    REDIS_SESSION_TTL: int = 3600  # 1 hour
+    REDIS_CACHE_TTL: int = 900  # 15 minutes for price/stock
 
-    # Security
-    SECRET_KEY: str
-    ALGORITHM: str = "HS256"
-    ACCESS_TOKEN_EXPIRE_MINUTES: int = 30
+    # PIM Integration
+    PERKY_OS_API_URL: str = "https://api.perkyos.com/v1"
+    PERKY_OS_JWT_SECRET: str
+    PERKY_OS_TIMEOUT: int = 5000  # milliseconds
+
+    # OpenAI for PydanticAI
+    OPENAI_API_KEY: str
+    OPENAI_MODEL: str = "gpt-4o-mini"
+    OPENAI_TEMPERATURE: float = 0.3
+    OPENAI_MAX_RETRIES: int = 2
+
+    # WebSocket
+    WS_HEARTBEAT_INTERVAL: int = 30
+    WS_MAX_CONNECTIONS: int = 100
+    WS_MESSAGE_RATE_LIMIT: int = 10
 
     class Config:
         env_file = ".env"
@@ -147,6 +164,14 @@ settings = Settings()
 ```
 
 ## Task 2: Setup Docker Development Environment
+
+### Important Note on Authentication
+
+This system uses **session-based anonymous chat** - no user authentication required:
+
+- WebSocket sessions are tracked via `session_id`
+- JWT is only used for PERKY OS API authentication (server-to-server)
+- No user registration, login, or password management needed
 
 ### 2.1 Create Dockerfile
 
@@ -194,7 +219,10 @@ services:
       - POSTGRES_PASSWORD=perky_password
       - POSTGRES_DB=perky_db
       - REDIS_URL=redis://redis:6379/0
-      - SECRET_KEY=your-secret-key-here-change-in-production
+      - PERKY_OS_API_URL=https://api.perkyos.com/v1
+      - PERKY_OS_JWT_SECRET=${PERKY_OS_JWT_SECRET}
+      - OPENAI_API_KEY=${OPENAI_API_KEY}
+      - OPENAI_MODEL=gpt-4o-mini
     volumes:
       - ./src:/app/src
       - ./tests:/app/tests
@@ -256,12 +284,31 @@ networks:
 
 ```env
 # .env.example
+# Database
 POSTGRES_SERVER=localhost
 POSTGRES_USER=perky_user
 POSTGRES_PASSWORD=perky_password
 POSTGRES_DB=perky_db
+
+# Redis
 REDIS_URL=redis://localhost:6379/0
-SECRET_KEY=your-secret-key-here-change-in-production
+REDIS_SESSION_TTL=3600
+REDIS_CACHE_TTL=900
+
+# PIM Integration
+PERKY_OS_API_URL=https://api.perkyos.com/v1
+PERKY_OS_JWT_SECRET=your-pim-jwt-secret
+PERKY_OS_TIMEOUT=5000
+
+# OpenAI
+OPENAI_API_KEY=sk-your-openai-key
+OPENAI_MODEL=gpt-4o-mini
+OPENAI_TEMPERATURE=0.3
+
+# WebSocket
+WS_HEARTBEAT_INTERVAL=30
+WS_MAX_CONNECTIONS=100
+WS_MESSAGE_RATE_LIMIT=10
 ```
 
 ## Task 3: Configure PostgreSQL and Redis Connections
@@ -374,52 +421,115 @@ class BaseEntity(BaseModel):
         from_attributes = True
 ```
 
-### 4.2 User Entity
+### 4.2 Session Entity
 
 ```python
-# src/domain/entities/user.py
-from typing import Optional
+# src/domain/entities/session.py
+from datetime import datetime
+from typing import Optional, Dict, Any
+from pydantic import Field
 from src.domain.entities.base import BaseEntity
-from src.domain.value_objects.email import Email
 
-class User(BaseEntity):
-    email: Email
-    username: str
-    first_name: str
-    last_name: str
-    is_verified: bool = False
-    is_superuser: bool = False
-    hashed_password: Optional[str] = None
+class Session(BaseEntity):
+    """Anonymous session for chat interactions"""
+    session_id: str  # Unique WebSocket session identifier
+    conversation_id: Optional[str] = None
+    started_at: datetime = Field(default_factory=datetime.utcnow)
+    last_activity: datetime = Field(default_factory=datetime.utcnow)
+    metadata: Dict[str, Any] = Field(default_factory=dict)  # Browser info, IP, etc.
 
-    def get_full_name(self) -> str:
-        return f"{self.first_name} {self.last_name}"
+    def is_expired(self, ttl_seconds: int = 3600) -> bool:
+        """Check if session has expired based on TTL"""
+        elapsed = (datetime.utcnow() - self.last_activity).total_seconds()
+        return elapsed > ttl_seconds
 
-    def can_access_admin(self) -> bool:
-        return self.is_superuser and self.is_verified
+    def update_activity(self):
+        """Update last activity timestamp"""
+        self.last_activity = datetime.utcnow()
 ```
 
-### 4.3 Value Objects
+### 4.3 Conversation Entity
 
 ```python
-# src/domain/value_objects/email.py
-from pydantic import BaseModel, EmailStr, validator
+# src/domain/entities/conversation.py
+from datetime import datetime
+from typing import List, Dict, Any
+from pydantic import Field
+from src.domain.entities.base import BaseEntity
+from src.domain.entities.message import Message
 
-class Email(BaseModel):
-    value: EmailStr
+class Conversation(BaseEntity):
+    """Aggregate root for chat conversations"""
+    session_id: str  # Links to session, not user
+    messages: List[Message] = Field(default_factory=list)
+    started_at: datetime = Field(default_factory=datetime.utcnow)
+    last_activity: datetime = Field(default_factory=datetime.utcnow)
+    metadata: Dict[str, Any] = Field(default_factory=dict)
 
-    @validator('value')
-    def validate_email(cls, v):
-        # Add custom email validation if needed
-        return v.lower()
+    def add_message(self, message: Message):
+        """Add a message to the conversation"""
+        self.messages.append(message)
+        self.last_activity = datetime.utcnow()
 
-    def __str__(self):
-        return self.value
-
-    def __repr__(self):
-        return f"Email(value='{self.value}')"
+    def get_context(self, limit: int = 10) -> List[Message]:
+        """Get recent messages for context"""
+        return self.messages[-limit:] if self.messages else []
 ```
 
-### 4.4 Repository Interface
+### 4.4 Message Entity
+
+```python
+# src/domain/entities/message.py
+from datetime import datetime
+from typing import Optional, Dict, Any, Literal
+from pydantic import Field
+from src.domain.entities.base import BaseEntity
+
+class Message(BaseEntity):
+    """Individual chat message"""
+    conversation_id: str
+    sender_type: Literal["user", "ai_agent"]
+    content: str
+    detected_language: str = "id"  # Default to Indonesian
+    intent: Optional[str] = None  # Product inquiry, price check, etc.
+    metadata: Dict[str, Any] = Field(default_factory=dict)
+
+    def is_product_query(self) -> bool:
+        """Check if message contains product query"""
+        return self.intent in ["product_inquiry", "price_check", "stock_check"]
+```
+
+### 4.5 Value Objects
+
+```python
+# src/domain/value_objects/product_info.py
+from pydantic import BaseModel, Field
+from typing import Optional, Dict, Any, Literal
+
+class ProductInfo(BaseModel):
+    """Product information from PIM"""
+    sku: str
+    name: str
+    description: Optional[str] = None
+    price: Optional[float] = None
+    stock: Optional[int] = None
+    unit: str = "lembar"  # Default unit in Indonesian
+    specifications: Dict[str, Any] = Field(default_factory=dict)
+    source: Literal["pim", "cache"] = "pim"
+
+# src/domain/value_objects/query_intent.py
+from pydantic import BaseModel, Field
+from typing import Literal, Optional
+
+class QueryIntent(BaseModel):
+    """Classified user query intent"""
+    type: Literal["product_inquiry", "price_check", "stock_check", "general"]
+    product_name: Optional[str] = None
+    quantity: Optional[int] = None
+    confidence: float = Field(ge=0.0, le=1.0)
+```
+
+### 4.6 Repository Interface
 
 ```python
 # src/domain/repositories/base.py
@@ -552,25 +662,60 @@ alembic upgrade head
 ### 5.5 Database Models
 
 ```python
-# src/infrastructure/database/models/user.py
-from sqlalchemy import Column, String, Boolean, DateTime
+# src/infrastructure/database/models/conversation.py
+from sqlalchemy import Column, String, DateTime, JSON
 from sqlalchemy.sql import func
 from src.infrastructure.database.session import Base
 
-class UserModel(Base):
-    __tablename__ = "users"
+class ConversationModel(Base):
+    __tablename__ = "conversations"
 
     id = Column(String, primary_key=True)
-    email = Column(String, unique=True, index=True, nullable=False)
-    username = Column(String, unique=True, index=True, nullable=False)
-    first_name = Column(String, nullable=False)
-    last_name = Column(String, nullable=False)
-    hashed_password = Column(String, nullable=False)
-    is_active = Column(Boolean, default=True)
-    is_verified = Column(Boolean, default=False)
-    is_superuser = Column(Boolean, default=False)
+    session_id = Column(String, unique=True, index=True, nullable=False)
+    started_at = Column(DateTime(timezone=True), server_default=func.now())
+    last_activity = Column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())
+    metadata = Column(JSON, default={})
     created_at = Column(DateTime(timezone=True), server_default=func.now())
     updated_at = Column(DateTime(timezone=True), onupdate=func.now())
+
+# src/infrastructure/database/models/message.py
+from sqlalchemy import Column, String, DateTime, Text, JSON, Enum
+from sqlalchemy.sql import func
+from src.infrastructure.database.session import Base
+import enum
+
+class SenderType(enum.Enum):
+    USER = "user"
+    AI_AGENT = "ai_agent"
+
+class MessageModel(Base):
+    __tablename__ = "messages"
+
+    id = Column(String, primary_key=True)
+    conversation_id = Column(String, nullable=False, index=True)
+    sender_type = Column(Enum(SenderType), nullable=False)
+    content = Column(Text, nullable=False)
+    detected_language = Column(String(10), default="id")
+    intent = Column(String(100), nullable=True)
+    metadata = Column(JSON, default={})
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
+
+# src/infrastructure/database/models/product_query.py
+from sqlalchemy import Column, String, Integer, DateTime, JSON
+from sqlalchemy.sql import func
+from src.infrastructure.database.session import Base
+
+class ProductQueryModel(Base):
+    __tablename__ = "product_queries"
+
+    id = Column(String, primary_key=True)
+    message_id = Column(String, nullable=True)
+    product_name = Column(String(255), nullable=True)
+    quantity = Column(Integer, nullable=True)
+    query_type = Column(String(50), nullable=True)
+    response_data = Column(JSON, default={})
+    response_time_ms = Column(Integer, nullable=True)
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
 ```
 
 ## Verification Commands
@@ -630,10 +775,13 @@ perky-ai-assistant-v2/
 │   │   ├── entities/
 │   │   │   ├── __init__.py
 │   │   │   ├── base.py
-│   │   │   └── user.py
+│   │   │   ├── session.py
+│   │   │   ├── conversation.py
+│   │   │   └── message.py
 │   │   ├── value_objects/
 │   │   │   ├── __init__.py
-│   │   │   └── email.py
+│   │   │   ├── product_info.py
+│   │   │   └── query_intent.py
 │   │   ├── repositories/
 │   │   │   ├── __init__.py
 │   │   │   └── base.py
@@ -648,7 +796,9 @@ perky-ai-assistant-v2/
 │   │   │   ├── session.py
 │   │   │   └── models/
 │   │   │       ├── __init__.py
-│   │   │       └── user.py
+│   │   │       ├── conversation.py
+│   │   │       ├── message.py
+│   │   │       └── product_query.py
 │   │   ├── cache/
 │   │   │   ├── __init__.py
 │   │   │   └── redis_client.py
@@ -689,8 +839,8 @@ perky-ai-assistant-v2/
 
 ## Next Steps
 
-1. **Add Authentication**: Implement JWT-based authentication using FastAPI security utilities
-2. **Add API Endpoints**: Create CRUD endpoints for your domain entities
+1. **Add PydanticAI Integration**: Configure AI agent for Indonesian steel product inquiries
+2. **Add WebSocket Endpoints**: Implement real-time chat with session management
 3. **Add Testing**: Write unit tests for domain logic and integration tests for API endpoints
 4. **Add CI/CD**: Setup GitHub Actions for automated testing and deployment
 5. **Add Monitoring**: Integrate logging and monitoring tools like Sentry or DataDog
