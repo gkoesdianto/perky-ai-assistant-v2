@@ -1,4 +1,6 @@
+# ============================================
 # Python
+# ============================================
 __pycache__/
 *.py[cod]
 *$py.class
@@ -16,49 +18,231 @@ parts/
 sdist/
 var/
 wheels/
+share/python-wheels/
 *.egg-info/
 .installed.cfg
 *.egg
+MANIFEST
+pip-wheel-metadata/
+*.manifest
+*.spec
 
-# Virtual Environment
+# PyInstaller
+*.manifest
+*.spec
+
+# Unit test / coverage reports
+htmlcov/
+.tox/
+.nox/
+.coverage
+.coverage.*
+.cache
+nosetests.xml
+coverage.xml
+*.cover
+*.py,cover
+.hypothesis/
+.pytest_cache/
+cover/
+
+# Translations
+*.mo
+*.pot
+
+# Django stuff (if applicable)
+*.log
+local_settings.py
+db.sqlite3
+db.sqlite3-journal
+
+# Flask stuff (if applicable)
+instance/
+.webassets-cache
+
+# Scrapy stuff (if applicable)
+.scrapy
+
+# Sphinx documentation
+docs/_build/
+docs/.build/
+
+# PyBuilder
+.pybuilder/
+target/
+
+# Jupyter Notebook
+.ipynb_checkpoints
+*.ipynb
+
+# IPython
+profile_default/
+ipython_config.py
+
+# pyenv
+.python-version
+
+# pipenv
+Pipfile.lock
+
+# poetry
+poetry.lock
+
+# pdm
+.pdm.toml
+
+# PEP 582
+__pypackages__/
+
+# Celery stuff
+celerybeat-schedule
+celerybeat.pid
+
+# SageMath parsed files
+*.sage.py
+
+# ============================================
+# Virtual Environments
+# ============================================
 venv/
 ENV/
 env/
 .venv
+.ENV
+.env.venv
+venv.bak/
+virtualenv/
 
-# IDE
+# ============================================
+# IDE and Editor
+# ============================================
 .vscode/
 .idea/
 *.swp
 *.swo
 *~
 .DS_Store
+Thumbs.db
+.project
+.pydevproject
+.settings/
+.classpath
+*.sublime-project
+*.sublime-workspace
+.ropeproject/
 
-# Environment variables
+# ============================================
+# Environment Variables
+# ============================================
 .env
+.env.*
+!.env.example
 .env.local
 .env.*.local
+*.env
 
+# ============================================
 # Database
+# ============================================
 *.db
 *.sqlite
 *.sqlite3
+*.db-journal
+*.db-wal
+*.db-shm
 
-# Logs
+# ============================================
+# Logs and Temporary Files
+# ============================================
 logs/
 *.log
+*.pid
+*.seed
+*.pid.lock
+*.tmp
+*.temp
+*.bak
+*.backup
+*.orig
+*.rej
+*.swn
+*.swm
 
+# ============================================
 # Testing
+# ============================================
 .pytest_cache/
 .coverage
 htmlcov/
 .tox/
+.benchmarks/
+test-results/
+junit.xml
+.mutmut-cache
 
+# ============================================
+# Type Checking
+# ============================================
+.mypy_cache/
+.dmypy.json
+dmypy.json
+.pyre/
+.pytype/
+.ruff_cache/
+
+# ============================================
+# FastAPI / Uvicorn specific
+# ============================================
+*.sock
+
+# ============================================
 # Alembic
-alembic.ini
+# ============================================
+# alembic.ini is typically tracked but can be ignored if using env-specific configs
+# alembic.ini
 
+# ============================================
 # Docker
+# ============================================
 docker-compose.override.yml
+.dockerignore.local
 
-# Claude AI configurations
+# ============================================
+# Security
+# ============================================
+*.pem
+*.key
+*.crt
+*.p12
+*.pfx
+secrets/
+credentials/
+
+# ============================================
+# OS Files
+# ============================================
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Desktop.ini
+$RECYCLE.BIN/
+*.lnk
+
+# ============================================
+# Package Manager
+# ============================================
+node_modules/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+.npm
+.yarn
+
+# ============================================
+# Claude AI and Serena configurations
+# ============================================
 .claude/
+.serena/
