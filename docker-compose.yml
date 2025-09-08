@@ -10,7 +10,10 @@ services:
       - POSTGRES_PASSWORD=perky_password
       - POSTGRES_DB=perky_db
       - REDIS_URL=redis://redis:6379/0
-      - SECRET_KEY=your-secret-key-here-change-in-production
+      - PERKY_OS_API_URL=https://api.perkyos.com/v1
+      - PERKY_OS_JWT_SECRET=${PERKY_OS_JWT_SECRET}
+      - OPENAI_API_KEY=${OPENAI_API_KEY}
+      - OPENAI_MODEL=gpt-4o-mini
     volumes:
       - ./src:/app/src
       - ./tests:/app/tests
