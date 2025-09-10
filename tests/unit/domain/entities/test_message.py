@@ -1,6 +1,6 @@
 import pytest
 from src.domain.entities.message import Message
-from tests.unit.factories import MessageFactory
+from tests.unit.domain.factories import MessageFactory
 
 
 class TestMessage:
