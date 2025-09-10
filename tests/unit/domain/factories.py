@@ -7,6 +7,8 @@ from typing import Dict, Any, Optional
 from src.domain.entities.session import Session
 from src.domain.entities.conversation import Conversation
 from src.domain.entities.message import Message
+from src.domain.value_objects.product_info import ProductInfo
+from src.domain.value_objects.query_intent import QueryIntent
 
 
 class SessionFactory:
@@ -187,3 +189,119 @@ class MessageFactory:
             content=content_map.get(intent, "Product query"),
             intent=intent,
         )
+
+
+class ProductInfoFactory:
+    @staticmethod
+    def create(**kwargs) -> ProductInfo:
+        defaults = {
+            "sku": f"PROD-{uuid.uuid4().hex[:6].upper()}",
+            "name": "Test Product",
+            "unit": "lembar",
+        }
+        return ProductInfo(**{**defaults, **kwargs})
+
+    @staticmethod
+    def create_steel_product(**kwargs) -> ProductInfo:
+        defaults = {
+            "sku": f"STEEL-{uuid.uuid4().hex[:6].upper()}",
+            "name": "Plat Baja 5mm",
+            "price": 150000.0,
+            "stock": 100,
+            "unit": "lembar",
+            "specifications": {
+                "thickness": "5mm",
+                "width": "1200mm",
+                "length": "2400mm",
+            },
+        }
+        return ProductInfo(**{**defaults, **kwargs})
+
+    @staticmethod
+    def create_with_required_fields_only(
+        sku: str = None, name: str = None
+    ) -> ProductInfo:
+        return ProductInfo(
+            sku=sku or f"MIN-{uuid.uuid4().hex[:6].upper()}",
+            name=name or "Minimal Product",
+        )
+
+    @staticmethod
+    def create_with_all_fields() -> ProductInfo:
+        return ProductInfo(
+            sku=f"FULL-{uuid.uuid4().hex[:6].upper()}",
+            name="Plat Baja SS400",
+            description="Plat baja kualitas tinggi untuk konstruksi",
+            price=250000.0,
+            stock=50,
+            unit="lembar",
+            specifications={
+                "grade": "SS400",
+                "thickness": "10mm",
+                "width": "1500mm",
+                "length": "3000mm",
+                "weight": "117.75kg",
+            },
+            source="pim",
+        )
+
+    @staticmethod
+    def create_from_cache(**kwargs) -> ProductInfo:
+        defaults = {
+            "sku": f"CACHE-{uuid.uuid4().hex[:6].upper()}",
+            "name": "Cached Product",
+            "source": "cache",
+        }
+        return ProductInfo(**{**defaults, **kwargs})
+
+
+class QueryIntentFactory:
+    @staticmethod
+    def create(**kwargs) -> QueryIntent:
+        defaults = {"type": "general", "confidence": 0.85}
+        return QueryIntent(**{**defaults, **kwargs})
+
+    @staticmethod
+    def create_product_inquiry(**kwargs) -> QueryIntent:
+        defaults = {
+            "type": "product_inquiry",
+            "product_name": "plat baja",
+            "confidence": 0.95,
+        }
+        return QueryIntent(**{**defaults, **kwargs})
+
+    @staticmethod
+    def create_price_check(**kwargs) -> QueryIntent:
+        defaults = {
+            "type": "price_check",
+            "product_name": "plat baja 5mm",
+            "confidence": 0.98,
+        }
+        return QueryIntent(**{**defaults, **kwargs})
+
+    @staticmethod
+    def create_stock_check(**kwargs) -> QueryIntent:
+        defaults = {
+            "type": "stock_check",
+            "product_name": "plat baja SS400",
+            "quantity": 10,
+            "confidence": 0.92,
+        }
+        return QueryIntent(**{**defaults, **kwargs})
+
+    @staticmethod
+    def create_general_query(**kwargs) -> QueryIntent:
+        defaults = {"type": "general", "confidence": 0.85}
+        return QueryIntent(**{**defaults, **kwargs})
+
+    @staticmethod
+    def create_with_low_confidence(type: str = "general", **kwargs) -> QueryIntent:
+        defaults = {"type": type, "confidence": 0.3}
+        return QueryIntent(**{**defaults, **kwargs})
+
+    @staticmethod
+    def create_with_high_confidence(
+        type: str = "product_inquiry", **kwargs
+    ) -> QueryIntent:
+        defaults = {"type": type, "confidence": 0.99}
+        return QueryIntent(**{**defaults, **kwargs})
