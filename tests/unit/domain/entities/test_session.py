@@ -1,9 +1,4 @@
-"""
-Unit tests for Session entity focusing on business logic and session management.
-
-Test Coverage Required: 100%
-Priority: CRITICAL
-"""
+"""Unit tests for Session entity focusing on business logic and session management."""
 
 import pytest
 from datetime import datetime, timezone, timedelta
@@ -14,16 +9,14 @@ from concurrent.futures import ThreadPoolExecutor
 
 from src.domain.entities.session import Session
 from src.domain.entities.base import BaseEntity
+from tests.unit.factories import SessionFactory
 
 
 class TestSessionCreation:
     """Test suite for session creation and initialization."""
 
     def test_session_creation(self):
-        """
-        Test creation with required session_id.
-        Priority: HIGH
-        """
+        """Test creation with required session_id."""
         session = Session(session_id="test-123")
 
         assert session.session_id == "test-123"
@@ -70,7 +63,6 @@ class TestSessionExpiry:
     def test_is_expired_fresh_session(self):
         """
         Test non-expired session (TTL not exceeded).
-        Priority: CRITICAL
         """
         session = Session(session_id="fresh-session")
 
@@ -81,7 +73,6 @@ class TestSessionExpiry:
     def test_is_expired_old_session(self):
         """
         Test expired session (TTL exceeded).
-        Priority: CRITICAL
         """
         session = Session(session_id="old-session")
 
@@ -106,7 +97,6 @@ class TestSessionExpiry:
     def test_is_expired_edge_cases(self, ttl, expected):
         """
         Test with 0, negative, and very large TTL values.
-        Priority: HIGH
         """
         session = Session(session_id="edge-case-session")
 
@@ -140,7 +130,6 @@ class TestSessionActivity:
     def test_update_activity(self):
         """
         Verify update_activity() updates timestamp.
-        Priority: CRITICAL
         """
         session = Session(session_id="activity-session")
         initial_activity = session.last_activity
@@ -185,7 +174,6 @@ class TestSessionLifecycle:
     def test_session_lifecycle(self):
         """
         Test complete session lifecycle from creation to expiry.
-        Priority: HIGH
         """
         session = Session(session_id="lifecycle-session")
 
@@ -240,7 +228,6 @@ class TestSessionMetadata:
     def test_metadata_storage(self):
         """
         Test storing browser info, IP in metadata.
-        Priority: MEDIUM
         """
         metadata = {
             "browser": "Firefox",
@@ -298,7 +285,6 @@ class TestSessionConcurrency:
     def test_concurrent_activity_updates(self):
         """
         Test race conditions in activity updates.
-        Priority: HIGH
         """
         session = Session(session_id="concurrent-session")
         initial_activity = session.last_activity
@@ -397,89 +383,3 @@ class TestSessionSerialization:
 
         assert original.session_id == "original"
         assert original.conversation_id == "conv-1"
-
-
-class SessionFactory:
-    """Factory for creating test sessions with sensible defaults."""
-
-    @staticmethod
-    def create(
-        session_id: str = None,
-        conversation_id: str = None,
-        metadata: Dict[str, Any] = None,
-        **kwargs,
-    ) -> Session:
-        """Create test session with sensible defaults."""
-        import uuid
-
-        defaults = {
-            "session_id": session_id or f"session-{uuid.uuid4().hex[:8]}",
-            "conversation_id": conversation_id,
-            "metadata": metadata or {"test": True},
-        }
-        return Session(**{**defaults, **kwargs})
-
-    @staticmethod
-    def create_expired(ttl: int = 3600) -> Session:
-        """Create an already-expired session."""
-        session = SessionFactory.create()
-        hours_ago = (ttl / 3600) + 1
-        session.last_activity = datetime.now(timezone.utc) - timedelta(hours=hours_ago)
-        return session
-
-    @staticmethod
-    def create_with_conversation(conversation_id: str = None) -> Session:
-        """Create session with conversation attached."""
-        import uuid
-
-        conv_id = conversation_id or f"conv-{uuid.uuid4().hex[:8]}"
-        return SessionFactory.create(conversation_id=conv_id)
-
-    @staticmethod
-    def create_with_metadata() -> Session:
-        """Create session with realistic metadata."""
-        metadata = {
-            "browser": "Chrome",
-            "browser_version": "120.0.0",
-            "ip": "192.168.1.100",
-            "location": "Jakarta",
-            "user_agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64)",
-            "screen_resolution": "1920x1080",
-        }
-        return SessionFactory.create(metadata=metadata)
-
-
-class TestSessionFactory:
-    """Test the SessionFactory utility."""
-
-    def test_factory_create_default(self):
-        """Test factory creates session with defaults."""
-        session = SessionFactory.create()
-
-        assert session.session_id.startswith("session-")
-        assert session.conversation_id is None
-        assert session.metadata == {"test": True}
-        assert not session.is_expired(3600)
-
-    def test_factory_create_expired(self):
-        """Test factory creates expired session."""
-        session = SessionFactory.create_expired(3600)
-
-        assert session.is_expired(3600)
-        assert not session.is_expired(86400)
-
-    def test_factory_create_with_conversation(self):
-        """Test factory creates session with conversation."""
-        session = SessionFactory.create_with_conversation()
-
-        assert session.conversation_id is not None
-        assert session.conversation_id.startswith("conv-")
-
-    def test_factory_create_with_metadata(self):
-        """Test factory creates session with metadata."""
-        session = SessionFactory.create_with_metadata()
-
-        assert session.metadata["browser"] == "Chrome"
-        assert session.metadata["location"] == "Jakarta"
-        assert "ip" in session.metadata
-        assert "user_agent" in session.metadata

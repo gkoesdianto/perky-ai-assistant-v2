@@ -1,9 +1,4 @@
-"""
-Unit tests for BaseEntity focusing on business logic and domain rules.
-
-Test Coverage Required: 80%
-Priority: MEDIUM
-"""
+"""Unit tests for BaseEntity focusing on business logic and domain rules."""
 
 import json
 from datetime import datetime, timezone
@@ -17,10 +12,7 @@ class TestBaseEntity:
     """Test suite for BaseEntity core functionality."""
 
     def test_default_values(self):
-        """
-        Test that our chosen default values are applied correctly.
-        Priority: HIGH
-        """
+        """Test that our chosen default values are applied correctly."""
         entity = BaseEntity()
 
         assert entity.is_active is True
@@ -32,10 +24,7 @@ class TestBaseEntity:
         assert isinstance(entity.is_active, bool)
 
     def test_entity_inheritance(self):
-        """
-        Test that subclasses properly inherit BaseEntity fields.
-        Priority: HIGH
-        """
+        """Test that subclasses properly inherit BaseEntity fields."""
         session = Session(session_id="test-123")
 
         assert hasattr(session, "id")
@@ -52,10 +41,7 @@ class TestBaseEntity:
         assert isinstance(session, BaseEntity)
 
     def test_entity_serialization(self):
-        """
-        Test model_dump() and model_dump_json() for our use cases.
-        Priority: MEDIUM
-        """
+        """Test model_dump() and model_dump_json() for our use cases."""
         entity = BaseEntity()
         entity.is_active = False
         entity.updated_at = datetime.now(timezone.utc)
