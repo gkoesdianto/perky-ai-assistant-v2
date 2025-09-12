@@ -4,11 +4,13 @@ import uuid
 from datetime import datetime, timezone, timedelta
 from typing import Dict, Any, Optional
 
+from decimal import Decimal
 from src.domain.entities.session import Session
 from src.domain.entities.conversation import Conversation
 from src.domain.entities.message import Message
 from src.domain.value_objects.product_info import ProductInfo
 from src.domain.value_objects.query_intent import QueryIntent
+from src.domain.value_objects.variant_info import VariantInfo
 
 
 class SessionFactory:
@@ -305,3 +307,124 @@ class QueryIntentFactory:
     ) -> QueryIntent:
         defaults = {"type": type, "confidence": 0.99}
         return QueryIntent(**{**defaults, **kwargs})
+
+
+class VariantInfoFactory:
+    """Factory for creating test VariantInfo instances with sensible defaults."""
+
+    @staticmethod
+    def create(**kwargs) -> VariantInfo:
+        """Create basic variant with minimal required fields."""
+        defaults = {
+            "variant_id": f"var_{uuid.uuid4().hex[:8]}",
+            "sku": f"SKU-{uuid.uuid4().hex[:6].upper()}",
+            "product_id": f"prod_{uuid.uuid4().hex[:8]}",
+            "variant_name": "Test Variant",
+            "price": Decimal("100000"),
+            "stock_quantity": 10,
+        }
+        return VariantInfo(**{**defaults, **kwargs})
+
+    @staticmethod
+    def create_steel_variant(**kwargs) -> VariantInfo:
+        """Create realistic steel product variant."""
+        defaults = {
+            "variant_id": f"var_steel_{uuid.uuid4().hex[:8]}",
+            "sku": f"STEEL-{uuid.uuid4().hex[:6].upper()}",
+            "product_id": "prod_plat_baja",
+            "variant_name": "Plat Baja 5mm x 1200mm x 2400mm",
+            "price": Decimal("500000"),
+            "stock_quantity": 25,
+            "stock_unit": "lembar",
+            "specifications": {
+                "thickness": "5mm",
+                "width": "1200mm",
+                "length": "2400mm",
+                "grade": "SS400",
+                "weight": "56.52kg",
+            },
+            "source": "pim",
+            "is_available": True,
+        }
+        return VariantInfo(**{**defaults, **kwargs})
+
+    @staticmethod
+    def create_hollow_variant(
+        material: str = "hitam", dimensions: str = "40x40", **kwargs
+    ) -> VariantInfo:
+        """Create hollow steel (besi hollow) variant."""
+        defaults = {
+            "variant_id": f"var_hollow_{uuid.uuid4().hex[:8]}",
+            "sku": f"HOLLOW-{material.upper()}-{dimensions}",
+            "product_id": "prod_hollow",
+            "variant_name": f"Besi Hollow {material.title()} {dimensions}",
+            "price": Decimal("750000"),
+            "stock_quantity": 50,
+            "stock_unit": "batang",
+            "specifications": {
+                "material": material,
+                "dimensions": dimensions,
+                "thickness": "2mm",
+                "length": "6000mm",
+                "type": "square",
+            },
+            "source": "pim",
+            "is_available": True,
+        }
+        return VariantInfo(**{**defaults, **kwargs})
+
+    @staticmethod
+    def create_out_of_stock(**kwargs) -> VariantInfo:
+        """Create variant with no stock."""
+        defaults = {
+            "variant_id": f"var_oos_{uuid.uuid4().hex[:8]}",
+            "sku": f"OOS-{uuid.uuid4().hex[:6].upper()}",
+            "product_id": f"prod_{uuid.uuid4().hex[:8]}",
+            "variant_name": "Out of Stock Variant",
+            "price": Decimal("200000"),
+            "stock_quantity": 0,
+            "is_available": True,
+        }
+        return VariantInfo(**{**defaults, **kwargs})
+
+    @staticmethod
+    def create_unavailable(**kwargs) -> VariantInfo:
+        """Create unavailable variant (discontinued/inactive)."""
+        defaults = {
+            "variant_id": f"var_unavail_{uuid.uuid4().hex[:8]}",
+            "sku": f"UNAVAIL-{uuid.uuid4().hex[:6].upper()}",
+            "product_id": f"prod_{uuid.uuid4().hex[:8]}",
+            "variant_name": "Unavailable Variant",
+            "price": Decimal("150000"),
+            "stock_quantity": 100,
+            "is_available": False,
+        }
+        return VariantInfo(**{**defaults, **kwargs})
+
+    @staticmethod
+    def create_from_cache(**kwargs) -> VariantInfo:
+        """Create variant from cache source."""
+        defaults = {
+            "variant_id": f"var_cache_{uuid.uuid4().hex[:8]}",
+            "sku": f"CACHE-{uuid.uuid4().hex[:6].upper()}",
+            "product_id": f"prod_{uuid.uuid4().hex[:8]}",
+            "variant_name": "Cached Variant",
+            "price": Decimal("300000"),
+            "stock_quantity": 15,
+            "source": "cache",
+        }
+        return VariantInfo(**{**defaults, **kwargs})
+
+    @staticmethod
+    def create_with_specifications(specs: Dict[str, Any], **kwargs) -> VariantInfo:
+        """Create variant with custom specifications."""
+        defaults = {
+            "variant_id": f"var_spec_{uuid.uuid4().hex[:8]}",
+            "sku": f"SPEC-{uuid.uuid4().hex[:6].upper()}",
+            "product_id": f"prod_{uuid.uuid4().hex[:8]}",
+            "variant_name": "Variant with Specifications",
+            "price": Decimal("450000"),
+            "stock_quantity": 30,
+            "specifications": specs,
+        }
+        return VariantInfo(**{**defaults, **kwargs})
