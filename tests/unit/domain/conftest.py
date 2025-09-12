@@ -79,8 +79,8 @@ def price_check_intent():
 
 
 @pytest.fixture
-def stock_check_intent():
-    return QueryIntentFactory.create_stock_check()
+def availability_check_intent():
+    return QueryIntentFactory.create_availability_check()
 
 
 @pytest.fixture

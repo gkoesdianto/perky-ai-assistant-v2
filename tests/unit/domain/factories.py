@@ -2,13 +2,15 @@
 
 import uuid
 from datetime import datetime, timezone, timedelta
-from typing import Dict, Any, Optional
+from typing import Dict, Any
 
+from decimal import Decimal
 from src.domain.entities.session import Session
 from src.domain.entities.conversation import Conversation
 from src.domain.entities.message import Message
 from src.domain.value_objects.product_info import ProductInfo
-from src.domain.value_objects.query_intent import QueryIntent
+from src.domain.value_objects.query_intent import QueryIntent, ConversationContext
+from src.domain.value_objects.variant_info import VariantInfo
 
 
 class SessionFactory:
@@ -110,7 +112,7 @@ class ConversationFactory:
                 conversation_id=conversation.id,
                 sender_type="user",
                 content="Ada stok berapa lembar?",
-                intent="stock_check",
+                intent="availability_check",
                 detected_language="id",
             ),
             Message(
@@ -180,7 +182,7 @@ class MessageFactory:
         """Create message with product query intent."""
         content_map = {
             "price_check": "Berapa harga plat baja 5mm?",
-            "stock_check": "Ada stok plat baja SS400?",
+            "availability_check": "Ada stok plat baja SS400?",
             "product_inquiry": "Spesifikasi plat baja apa saja?",
         }
 
@@ -195,62 +197,49 @@ class ProductInfoFactory:
     @staticmethod
     def create(**kwargs) -> ProductInfo:
         defaults = {
-            "sku": f"PROD-{uuid.uuid4().hex[:6].upper()}",
-            "name": "Test Product",
-            "unit": "lembar",
+            "product_id": f"prod_{uuid.uuid4().hex[:8]}",
+            "product_name": "Test Product",
+            "variant_count": 5,
         }
         return ProductInfo(**{**defaults, **kwargs})
 
     @staticmethod
     def create_steel_product(**kwargs) -> ProductInfo:
         defaults = {
-            "sku": f"STEEL-{uuid.uuid4().hex[:6].upper()}",
-            "name": "Plat Baja 5mm",
-            "price": 150000.0,
-            "stock": 100,
-            "unit": "lembar",
-            "specifications": {
-                "thickness": "5mm",
-                "width": "1200mm",
-                "length": "2400mm",
-            },
+            "product_id": "prod_plat_baja",
+            "product_name": "Plat Baja",
+            "product_description": "High quality steel plates for construction",
+            "category": "Steel Plates",
+            "variant_count": 25,
         }
         return ProductInfo(**{**defaults, **kwargs})
 
     @staticmethod
     def create_with_required_fields_only(
-        sku: str = None, name: str = None
+        product_id: str = None, product_name: str = None
     ) -> ProductInfo:
         return ProductInfo(
-            sku=sku or f"MIN-{uuid.uuid4().hex[:6].upper()}",
-            name=name or "Minimal Product",
+            product_id=product_id or f"prod_{uuid.uuid4().hex[:8]}",
+            product_name=product_name or "Minimal Product",
+            variant_count=1,
         )
 
     @staticmethod
     def create_with_all_fields() -> ProductInfo:
         return ProductInfo(
-            sku=f"FULL-{uuid.uuid4().hex[:6].upper()}",
-            name="Plat Baja SS400",
-            description="Plat baja kualitas tinggi untuk konstruksi",
-            price=250000.0,
-            stock=50,
-            unit="lembar",
-            specifications={
-                "grade": "SS400",
-                "thickness": "10mm",
-                "width": "1500mm",
-                "length": "3000mm",
-                "weight": "117.75kg",
-            },
-            source="pim",
+            product_id="prod_plat_baja_full",
+            product_name="Plat Baja SS400",
+            product_description="Plat baja kualitas tinggi untuk konstruksi",
+            category="Steel Plates",
+            variant_count=15,
         )
 
     @staticmethod
     def create_from_cache(**kwargs) -> ProductInfo:
         defaults = {
-            "sku": f"CACHE-{uuid.uuid4().hex[:6].upper()}",
-            "name": "Cached Product",
-            "source": "cache",
+            "product_id": f"prod_cache_{uuid.uuid4().hex[:8]}",
+            "product_name": "Cached Product",
+            "variant_count": 3,
         }
         return ProductInfo(**{**defaults, **kwargs})
 
@@ -258,50 +247,299 @@ class ProductInfoFactory:
 class QueryIntentFactory:
     @staticmethod
     def create(**kwargs) -> QueryIntent:
-        defaults = {"type": "general", "confidence": 0.85}
+        defaults = {
+            "type": "general",
+            "confidence": 0.85,
+            "original_query": kwargs.get("original_query", "General query"),
+            "current_query": kwargs.get(
+                "current_query", kwargs.get("original_query", "General query")
+            ),
+            "conversation_context": kwargs.get(
+                "conversation_context", ConversationContext()
+            ),
+            "clarification_stage": kwargs.get("clarification_stage", "complete"),
+        }
+        # Remove duplicates from kwargs that are already in defaults
+        for key in [
+            "original_query",
+            "current_query",
+            "conversation_context",
+            "clarification_stage",
+        ]:
+            kwargs.pop(key, None)
         return QueryIntent(**{**defaults, **kwargs})
 
     @staticmethod
     def create_product_inquiry(**kwargs) -> QueryIntent:
+        product_name = kwargs.get("product_name", "plat baja")
+        original_query = kwargs.get("original_query", f"Spesifikasi {product_name}?")
         defaults = {
             "type": "product_inquiry",
-            "product_name": "plat baja",
+            "product_name": product_name,
             "confidence": 0.95,
+            "original_query": original_query,
+            "current_query": kwargs.get("current_query", original_query),
+            "conversation_context": kwargs.get(
+                "conversation_context", ConversationContext()
+            ),
+            "clarification_stage": kwargs.get("clarification_stage", "complete"),
         }
+        # Remove duplicates from kwargs
+        for key in [
+            "product_name",
+            "original_query",
+            "current_query",
+            "conversation_context",
+            "clarification_stage",
+        ]:
+            kwargs.pop(key, None)
         return QueryIntent(**{**defaults, **kwargs})
 
     @staticmethod
     def create_price_check(**kwargs) -> QueryIntent:
+        product_name = kwargs.get("product_name", "plat baja 5mm")
+        original_query = kwargs.get("original_query", f"Berapa harga {product_name}?")
         defaults = {
             "type": "price_check",
-            "product_name": "plat baja 5mm",
+            "product_name": product_name,
             "confidence": 0.98,
+            "original_query": original_query,
+            "current_query": kwargs.get("current_query", original_query),
+            "conversation_context": kwargs.get(
+                "conversation_context", ConversationContext()
+            ),
+            "clarification_stage": kwargs.get("clarification_stage", "complete"),
         }
+        # Remove duplicates from kwargs
+        for key in [
+            "product_name",
+            "original_query",
+            "current_query",
+            "conversation_context",
+            "clarification_stage",
+        ]:
+            kwargs.pop(key, None)
         return QueryIntent(**{**defaults, **kwargs})
 
     @staticmethod
-    def create_stock_check(**kwargs) -> QueryIntent:
+    def create_availability_check(**kwargs) -> QueryIntent:
+        product_name = kwargs.get("product_name", "plat baja SS400")
+        quantity = kwargs.get("quantity", 10)
+        original_query = kwargs.get(
+            "original_query", f"Ada stok {product_name} {quantity} unit?"
+        )
         defaults = {
-            "type": "stock_check",
-            "product_name": "plat baja SS400",
-            "quantity": 10,
+            "type": "availability_check",
+            "product_name": product_name,
+            "quantity": quantity,
             "confidence": 0.92,
+            "original_query": original_query,
+            "current_query": kwargs.get("current_query", original_query),
+            "conversation_context": kwargs.get(
+                "conversation_context", ConversationContext()
+            ),
+            "clarification_stage": kwargs.get("clarification_stage", "complete"),
         }
+        # Remove duplicates from kwargs
+        for key in [
+            "product_name",
+            "quantity",
+            "original_query",
+            "current_query",
+            "conversation_context",
+            "clarification_stage",
+        ]:
+            kwargs.pop(key, None)
         return QueryIntent(**{**defaults, **kwargs})
 
     @staticmethod
     def create_general_query(**kwargs) -> QueryIntent:
-        defaults = {"type": "general", "confidence": 0.85}
+        original_query = kwargs.get("original_query", "Bagaimana cara memesan?")
+        defaults = {
+            "type": "general",
+            "confidence": 0.85,
+            "original_query": original_query,
+            "current_query": kwargs.get("current_query", original_query),
+            "conversation_context": kwargs.get(
+                "conversation_context", ConversationContext()
+            ),
+            "clarification_stage": kwargs.get("clarification_stage", "complete"),
+        }
+        # Remove duplicates from kwargs
+        for key in [
+            "original_query",
+            "current_query",
+            "conversation_context",
+            "clarification_stage",
+        ]:
+            kwargs.pop(key, None)
         return QueryIntent(**{**defaults, **kwargs})
 
     @staticmethod
     def create_with_low_confidence(type: str = "general", **kwargs) -> QueryIntent:
-        defaults = {"type": type, "confidence": 0.3}
+        original_query = kwargs.get("original_query", "Vague query")
+        defaults = {
+            "type": type,
+            "confidence": 0.3,
+            "original_query": original_query,
+            "current_query": kwargs.get("current_query", original_query),
+            "conversation_context": kwargs.get(
+                "conversation_context", ConversationContext()
+            ),
+            "clarification_stage": kwargs.get("clarification_stage", "initial"),
+        }
+        # Remove duplicates from kwargs
+        for key in [
+            "original_query",
+            "current_query",
+            "conversation_context",
+            "clarification_stage",
+        ]:
+            kwargs.pop(key, None)
         return QueryIntent(**{**defaults, **kwargs})
 
     @staticmethod
     def create_with_high_confidence(
         type: str = "product_inquiry", **kwargs
     ) -> QueryIntent:
-        defaults = {"type": type, "confidence": 0.99}
+        original_query = kwargs.get("original_query", "Very clear query")
+        defaults = {
+            "type": type,
+            "confidence": 0.99,
+            "original_query": original_query,
+            "current_query": kwargs.get("current_query", original_query),
+            "conversation_context": kwargs.get(
+                "conversation_context", ConversationContext()
+            ),
+            "clarification_stage": kwargs.get("clarification_stage", "complete"),
+        }
+        # Remove duplicates from kwargs
+        for key in [
+            "original_query",
+            "current_query",
+            "conversation_context",
+            "clarification_stage",
+        ]:
+            kwargs.pop(key, None)
         return QueryIntent(**{**defaults, **kwargs})
+
+
+class VariantInfoFactory:
+    """Factory for creating test VariantInfo instances with sensible defaults."""
+
+    @staticmethod
+    def create(**kwargs) -> VariantInfo:
+        """Create basic variant with minimal required fields."""
+        defaults = {
+            "variant_id": f"var_{uuid.uuid4().hex[:8]}",
+            "sku": f"SKU-{uuid.uuid4().hex[:6].upper()}",
+            "product_id": f"prod_{uuid.uuid4().hex[:8]}",
+            "variant_name": "Test Variant",
+            "price": Decimal("100000"),
+            "stock_quantity": 10,
+        }
+        return VariantInfo(**{**defaults, **kwargs})
+
+    @staticmethod
+    def create_steel_variant(**kwargs) -> VariantInfo:
+        """Create realistic steel product variant."""
+        defaults = {
+            "variant_id": f"var_steel_{uuid.uuid4().hex[:8]}",
+            "sku": f"STEEL-{uuid.uuid4().hex[:6].upper()}",
+            "product_id": "prod_plat_baja",
+            "variant_name": "Plat Baja 5mm x 1200mm x 2400mm",
+            "price": Decimal("500000"),
+            "stock_quantity": 25,
+            "stock_unit": "lembar",
+            "specifications": {
+                "thickness": "5mm",
+                "width": "1200mm",
+                "length": "2400mm",
+                "grade": "SS400",
+                "weight": "56.52kg",
+            },
+            "source": "pim",
+            "is_available": True,
+        }
+        return VariantInfo(**{**defaults, **kwargs})
+
+    @staticmethod
+    def create_hollow_variant(
+        material: str = "hitam", dimensions: str = "40x40", **kwargs
+    ) -> VariantInfo:
+        """Create hollow steel (besi hollow) variant."""
+        defaults = {
+            "variant_id": f"var_hollow_{uuid.uuid4().hex[:8]}",
+            "sku": f"HOLLOW-{material.upper()}-{dimensions}",
+            "product_id": "prod_hollow",
+            "variant_name": f"Besi Hollow {material.title()} {dimensions}",
+            "price": Decimal("750000"),
+            "stock_quantity": 50,
+            "stock_unit": "batang",
+            "specifications": {
+                "material": material,
+                "dimensions": dimensions,
+                "thickness": "2mm",
+                "length": "6000mm",
+                "type": "square",
+            },
+            "source": "pim",
+            "is_available": True,
+        }
+        return VariantInfo(**{**defaults, **kwargs})
+
+    @staticmethod
+    def create_out_of_stock(**kwargs) -> VariantInfo:
+        """Create variant with no stock."""
+        defaults = {
+            "variant_id": f"var_oos_{uuid.uuid4().hex[:8]}",
+            "sku": f"OOS-{uuid.uuid4().hex[:6].upper()}",
+            "product_id": f"prod_{uuid.uuid4().hex[:8]}",
+            "variant_name": "Out of Stock Variant",
+            "price": Decimal("200000"),
+            "stock_quantity": 0,
+            "is_available": True,
+        }
+        return VariantInfo(**{**defaults, **kwargs})
+
+    @staticmethod
+    def create_unavailable(**kwargs) -> VariantInfo:
+        """Create unavailable variant (discontinued/inactive)."""
+        defaults = {
+            "variant_id": f"var_unavail_{uuid.uuid4().hex[:8]}",
+            "sku": f"UNAVAIL-{uuid.uuid4().hex[:6].upper()}",
+            "product_id": f"prod_{uuid.uuid4().hex[:8]}",
+            "variant_name": "Unavailable Variant",
+            "price": Decimal("150000"),
+            "stock_quantity": 100,
+            "is_available": False,
+        }
+        return VariantInfo(**{**defaults, **kwargs})
+
+    @staticmethod
+    def create_from_cache(**kwargs) -> VariantInfo:
+        """Create variant from cache source."""
+        defaults = {
+            "variant_id": f"var_cache_{uuid.uuid4().hex[:8]}",
+            "sku": f"CACHE-{uuid.uuid4().hex[:6].upper()}",
+            "product_id": f"prod_{uuid.uuid4().hex[:8]}",
+            "variant_name": "Cached Variant",
+            "price": Decimal("300000"),
+            "stock_quantity": 15,
+            "source": "cache",
+        }
+        return VariantInfo(**{**defaults, **kwargs})
+
+    @staticmethod
+    def create_with_specifications(specs: Dict[str, Any], **kwargs) -> VariantInfo:
+        """Create variant with custom specifications."""
+        defaults = {
+            "variant_id": f"var_spec_{uuid.uuid4().hex[:8]}",
+            "sku": f"SPEC-{uuid.uuid4().hex[:6].upper()}",
+            "product_id": f"prod_{uuid.uuid4().hex[:8]}",
+            "variant_name": "Variant with Specifications",
+            "price": Decimal("450000"),
+            "stock_quantity": 30,
+            "specifications": specs,
+        }
+        return VariantInfo(**{**defaults, **kwargs})
