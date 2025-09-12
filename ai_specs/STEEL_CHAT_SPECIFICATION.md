@@ -22,6 +22,10 @@ serving 10-20 concurrent users.
 - **Scale**: 10-20 concurrent users (startup phase)
 - **Deployment**: Containerized on DigitalOcean
 - **PIM Integration**: PERKY OS for real-time product data
+- **Multi-Turn Conversations**: Progressive variant clarification through contextual dialog
+
+> **Important**: This PRD includes a comprehensive Product-Variant domain model refactoring.
+> See [product-variant-refactoring-plan.md](./product-variant-refactoring-plan.md) for detailed implementation.
 
 ### Technical Stack
 
@@ -49,8 +53,10 @@ src/
 │   │   └── product_query.py  # Steel product query entity
 │   │
 │   ├── value_objects/
-│   │   ├── product_info.py   # Price, availability, SKU
-│   │   ├── query_intent.py   # User intent classification
+│   │   ├── product_info.py   # Product-level information
+│   │   ├── variant_info.py   # SKU-specific details (price, stock)
+│   │   ├── product_with_variants_info.py # Aggregate
+│   │   ├── query_intent.py   # Enhanced with multi-turn support
 │   │   └── message_content.py # Validated message text
 │   │
 │   ├── services/
@@ -146,6 +152,65 @@ src/
 ├── pytest.ini
 └── main.py                 # Application entry point
 ```
+
+## AI Agent Architecture
+
+### Pydantic AI Integration
+
+The system uses Pydantic AI with ChatGPT 4o-mini for natural language processing and
+progressive variant clarification through multi-turn conversations.
+
+#### DDD Layer Placement
+
+##### Application Layer (Primary Location)
+
+- AI Agent Orchestrator: Coordinates user input with domain logic
+- Query Intent Analyzer: Classifies user queries with multi-turn context
+- Conversation Flow Manager: Maintains state across conversation turns
+- PIM Tool Decision Logic: Determines when to query PERKY OS
+
+##### Infrastructure Layer
+
+- ChatGPT 4o-mini Client: External LLM integration
+- Pydantic AI Configuration: Response formatting and validation
+- PIM API Client: PERKY OS integration with JWT auth
+- Cache Manager: TTL-based caching for PIM responses
+
+##### Domain Layer
+
+- Clarification Rules Engine: Pure business logic for progressive clarification
+- Product-Variant Relationship Rules: Variant selection logic
+- Query Intent Classification Logic: Business rules for intent determination
+
+### Progressive Variant Clarification
+
+The AI agent supports multi-turn conversations to progressively clarify product variants:
+
+```yaml
+conversation_flow:
+  1_initial_query: "ada besi hollow?"
+  2_pim_search: Query PERKY OS for hollow steel products
+  3_clarification: "Material apa yang Anda cari? (galvanis/hitam)"
+  4_user_response: "galvanis"
+  5_pim_filter: Query variants with material=galvanis
+  6_clarification: "Ukuran berapa? (20x20, 30x30, 40x40)"
+  7_user_response: "30x30"
+  8_pim_lookup: Get specific SKU details
+  9_final_response: Present variant with price and stock
+```
+
+### Caching Strategy
+
+```yaml
+cache_ttl:
+  product_catalog: 24h    # Product structure rarely changes
+  variant_details: 1h     # Specifications relatively stable
+  price_stock: 15min      # Dynamic data needs freshness
+  search_results: 5min    # Balance between performance and accuracy
+```
+
+> **Note**: For detailed Product-Variant domain model refactoring and enhanced QueryIntent design,
+> see [product-variant-refactoring-plan.md](./product-variant-refactoring-plan.md)
 
 ## Technical Specifications
 
