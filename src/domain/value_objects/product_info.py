@@ -1,15 +1,21 @@
-from pydantic import BaseModel, Field
-from typing import Optional, Dict, Any, Literal
+from pydantic import BaseModel, Field, ConfigDict
+from typing import Optional
 
 
 class ProductInfo(BaseModel):
-    """Product information from PIM"""
+    """
+    Read-only representation of a product from PIM.
+    A product is a category that contains one or more variants.
+    """
 
-    sku: str
-    name: str
-    description: Optional[str] = None
-    price: Optional[float] = None
-    stock: Optional[int] = None
-    unit: str = "lembar"  # Default unit in Indonesian
-    specifications: Dict[str, Any] = Field(default_factory=dict)
-    source: Literal["pim", "cache"] = "pim"
+    model_config = ConfigDict(frozen=True)
+
+    product_id: str = Field(..., min_length=1, description="Unique product identifier")
+
+    product_name: str = Field(
+        ..., min_length=1, description="Product category name (e.g., 'Plat Baja')"
+    )
+    product_description: Optional[str] = Field(None, description="Product overview")
+
+    category: Optional[str] = Field(None, description="Product category in PIM")
+    variant_count: int = Field(..., ge=1, description="Number of available variants")
