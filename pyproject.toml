@@ -48,6 +48,7 @@ strict_equality = true
 minversion = "7.0"
 testpaths = ["tests"]
 python_files = ["test_*.py", "*_test.py"]
+pythonpath = ["."]
 addopts = [
     "-ra",
     "--strict-markers",

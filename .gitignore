@@ -246,3 +246,19 @@ yarn-error.log*
 # ============================================
 .claude/
 .serena/
+.spec-kit/
+memory/
+
+# ============================================
+# AI Generated Content and Specifications
+# ============================================
+claudedocs/
+
+# ============================================
+# Coverage Reports
+# ============================================
+.coverage
+htmlcov/
+coverage.html
+coverage.json
+coverage.lcov

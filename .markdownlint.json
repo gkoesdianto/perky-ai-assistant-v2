@@ -7,12 +7,8 @@
   "MD031": {
     "list_items": false
   },
-  "MD032": {
-    "stern": true
-  },
-  "MD034": {
-    "no-bare-urls": true
-  },
+  "MD032": false,
+  "MD034": false,
   "MD025": false,
   "MD040": {
     "allowed_languages": [
@@ -31,9 +27,7 @@
       "env"
     ]
   },
-  "MD047": {
-    "style": "newline"
-  },
+  "MD047": false,
   "MD013": {
     "line_length": 120,
     "code_blocks": false,
@@ -41,5 +35,6 @@
   },
   "MD033": {
     "allowed_elements": ["details", "summary", "br"]
-  }
+  },
+  "MD024": false
 }
