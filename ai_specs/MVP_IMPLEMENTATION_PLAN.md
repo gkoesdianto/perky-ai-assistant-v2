@@ -35,11 +35,32 @@ with mock infrastructure, enabling early validation and parallel development.
 
 ### MVP Scope
 
-The MVP implements a minimal but complete chat flow:
+The MVP implements a minimal but complete chat flow with dual-agent LLM architecture:
 
 ```text
-User → WebSocket → Application Layer → AI Agent → PIM (Mock) → Response
+User → WebSocket → Application Layer → Dual LLM Agents → PIM (Mock) → Response
+                           ↓
+              ┌────────────┴────────────┐
+              │                         │
+        Intent Analyzer          Response Generator
+           Agent                     Agent
 ```
+
+### Dual-Agent Architecture
+
+The system employs two specialized LLM agents for optimal performance:
+
+1. **Intent Analyzer Agent** (GPT-4o-mini):
+   - Analyzes user queries to extract structured intent
+   - Identifies product attributes and clarification needs
+   - Manages conversation state and stage
+   - Returns structured QueryIntent value objects
+
+2. **Response Generator Agent** (GPT-4o-mini):
+   - Generates natural language responses
+   - Incorporates product information contextually
+   - Maintains conversational coherence
+   - Adapts tone based on conversation stage
 
 ### Layer Responsibilities
 
@@ -52,13 +73,16 @@ Presentation Layer:
 Application Layer:
   - Use cases for business logic orchestration
   - DTOs for data transfer
-  - Service coordination
-  - AI agent wrapper
+  - Service ports (interfaces) for external services
+  - Query analyzer and AI agent ports
 
-Infrastructure Layer (Mocked Initially):
-  - Mock PIM client returning hardcoded products
+Infrastructure Layer:
+  - LLM implementations using PydanticAI
+    - LLMQueryAnalyzer (Intent Analyzer Agent)
+    - LLMResponseAgent (Response Generator Agent)
+  - Mock implementations for development/testing
+  - PIM client (mocked initially)
   - In-memory conversation storage
-  - Mock AI responses for testing
 
 Domain Layer (Already Implemented):
   - Entities: Session, Conversation, Message
@@ -79,6 +103,35 @@ Build the thinnest possible slice that works end-to-end:
 3. **Iterate Quickly**: Get feedback early and often
 4. **Parallel Development**: Teams can work on infrastructure while app layer uses mocks
 
+### LLM-Based Approach Benefits
+
+The dual-agent LLM architecture provides significant advantages over manual pattern matching:
+
+1. **Intelligent Query Understanding**:
+   - Handles complex, ambiguous queries with contextual understanding
+   - Automatically adapts to mixed Indonesian/English terminology
+   - Learns from conversation context without hardcoded rules
+
+2. **Scalable Intent Classification**:
+   - No need to maintain complex regex patterns
+   - Easily extendable to new product types and attributes
+   - Self-improving with better prompts, not code changes
+
+3. **Natural Conversation Flow**:
+   - Generates contextually appropriate responses
+   - Maintains conversation coherence across multiple turns
+   - Adapts tone and detail level based on query stage
+
+4. **Reduced Maintenance**:
+   - No brittle pattern matching code to update
+   - Business logic changes via prompt engineering
+   - Faster iteration on conversation quality
+
+5. **Cost-Effective with GPT-4o-mini**:
+   - Optimized for high-volume, low-latency operations
+   - Significantly cheaper than GPT-4 while maintaining quality
+   - Structured outputs ensure predictable response formats
+
 ### Dependency Order
 
 ```text
@@ -89,6 +142,87 @@ graph TD
     D --> E[WebSocket Endpoint]
     E --> F[Integration Testing]
     F --> G[Real Implementations]
+```
+
+### Project Dependencies
+
+The project already has all required dependencies configured:
+
+```python
+# requirements/base.txt (Existing)
+fastapi==0.115.5
+uvicorn[standard]==0.32.1
+pydantic==2.10.3
+pydantic-settings==2.6.1
+
+# LLM Integration (Already included)
+pydantic-ai==1.0.1  # For structured LLM agent implementation
+openai==1.57.0      # OpenAI client for GPT-4o-mini
+
+# Infrastructure (Already included)
+redis==5.2.0        # Session and cache management
+httpx==0.27.2       # Async HTTP client for PIM integration
+sqlalchemy==2.0.36  # Database persistence
+asyncpg==0.30.0     # Async PostgreSQL adapter
+alembic==1.14.0     # Database migrations
+
+# Authentication & Security
+python-jose[cryptography]==3.3.0
+python-multipart==0.0.7
+
+# requirements/dev.txt (Development & Testing)
+pytest==8.3.4
+pytest-asyncio==0.24.0
+pytest-cov==6.0.0
+black==24.10.0
+isort==5.13.2
+flake8==7.1.1
+mypy==1.13.0
+pre-commit==4.0.1
+```
+
+**Note**: All required dependencies for the dual-agent LLM architecture are already
+present in the project. The versions are more recent than initially proposed,
+which is beneficial for stability and features.
+
+### Environment Configuration
+
+Required environment variables for LLM integration and monitoring:
+
+```bash
+# .env file
+# OpenAI Configuration
+OPENAI_API_KEY=sk-...  # Required for LLM agents
+OPENAI_MODEL=gpt-4o-mini  # Cost-effective model choice
+OPENAI_MAX_TOKENS=500
+OPENAI_TEMPERATURE=0.7
+OPENAI_TIMEOUT_SECONDS=30  # API timeout
+OPENAI_MAX_RETRIES=3  # Retry attempts before fallback
+
+# Fallback Configuration
+USE_FALLBACK_MODE=true  # Enable fallback mechanisms
+CIRCUIT_BREAKER_THRESHOLD=3  # Failures before circuit opens
+CIRCUIT_BREAKER_TIMEOUT_MINUTES=5  # Circuit reset time
+USE_MOCK_FALLBACK=true  # Use mock analyzer as fallback
+
+# Monitoring Configuration
+ENABLE_LLM_MONITORING=true  # Enable performance monitoring
+MONITORING_WINDOW_SIZE=100  # Metrics window size
+ALERT_FAILURE_THRESHOLD=5  # Failures before alert
+ALERT_RESPONSE_TIME_MS=5000  # Slow response threshold
+
+# Testing Configuration
+LLM_TEST_MODE=false  # Use mocks in test mode
+MAX_TEST_COST_USD=1.00  # Maximum cost per test run
+CACHE_TEST_RESPONSES=true  # Cache API responses for tests
+
+# Feature Flags
+USE_LLM_AGENTS=true  # Enable LLM-based intent analysis
+ENABLE_MOCK_MODE=false  # Use mock implementations when no API key
+
+# Redis Configuration
+REDIS_URL=redis://localhost:6379/0
+SESSION_TTL_SECONDS=3600
 ```
 
 ---
@@ -370,28 +504,29 @@ class StartChatSessionUseCaseImpl(StartChatSessionUseCase):
 ### 2.2 Process User Message Use Case
 
 ```python
-# src/application/use_cases/process_user_message.py
+# src/application/use_cases/process_message.py
 from typing import Optional, Dict, Any
 from datetime import datetime, timezone
 from src.domain.entities import Message, Conversation
 from src.domain.value_objects import QueryIntent
 from src.application.dto import MessageDTO
+from src.application.ports import QueryAnalyzerPort, AIAgentPort
 from src.application.use_cases.interfaces import ProcessUserMessageUseCase
 
 class ProcessUserMessageUseCaseImpl(ProcessUserMessageUseCase):
-    """Implementation of process user message use case"""
+    """Implementation of process user message use case with dual-agent architecture"""
 
     def __init__(
         self,
-        ai_agent,
+        query_analyzer_port: QueryAnalyzerPort,
+        ai_agent_port: AIAgentPort,
         product_service,
-        conversation_repository,
-        query_analyzer
+        conversation_repository
     ):
-        self.ai_agent = ai_agent
+        self.query_analyzer = query_analyzer_port
+        self.ai_agent = ai_agent_port
         self.product_service = product_service
         self.conversation_repository = conversation_repository
-        self.query_analyzer = query_analyzer
 
     async def execute(
         self,
@@ -399,52 +534,70 @@ class ProcessUserMessageUseCaseImpl(ProcessUserMessageUseCase):
         content: str,
         metadata: Optional[Dict[str, Any]] = None
     ) -> MessageDTO:
-        """Process user message and generate AI response"""
+        """Process user message with dual-agent LLM architecture"""
 
-        # 1. Create user message
-        user_message = Message(
-            content=content,
-            sender_type="user",
-            session_id=session_id,
-            metadata=metadata or {}
-        )
-
-        # 2. Analyze query intent
-        intent = await self.query_analyzer.analyze(content)
-        user_message.metadata["intent"] = intent.to_dict()
-
-        # 3. Get conversation context
+        # 1. Get or create conversation
         conversation = await self.conversation_repository.get_by_session(session_id)
         if not conversation:
             conversation = Conversation(session_id=session_id)
 
-        # 4. Add user message to conversation
+        # 2. Prepare conversation context for intent analysis
+        context = {
+            "conversation_turn": len(conversation.messages) // 2 + 1,
+            "resolved_attributes": conversation.metadata.get("resolved_attributes", {}),
+            "conversation_history": [
+                {"sender": msg.sender_type, "content": msg.content}
+                for msg in conversation.messages[-6:]  # Last 3 exchanges
+            ]
+        }
+
+        # 3. Analyze query intent using LLM Query Analyzer
+        intent = await self.query_analyzer.analyze_intent(
+            query=content,
+            context=context
+        )
+
+        # 4. Create user message with intent metadata
+        user_message = Message(
+            content=content,
+            sender_type="user",
+            session_id=session_id,
+            metadata={
+                "intent": intent.dict(),
+                "conversation_turn": context["conversation_turn"]
+            }
+        )
         conversation.add_message(user_message)
 
-        # 5. Generate AI response
+        # 5. Generate AI response using Response Generator Agent
         context_messages = [
             MessageDTO.from_entity(msg)
-            for msg in conversation.messages[-5:]  # Last 5 messages for context
+            for msg in conversation.messages[-10:]  # More context for response generation
         ]
 
         response_content = await self.ai_agent.generate_response(
             message=content,
-            conversation_context=context_messages
+            conversation_context=context_messages,
+            intent=intent
         )
 
-        # 6. Create AI message
+        # 6. Create AI response message
         ai_message = Message(
             content=response_content,
             sender_type="ai_agent",
             session_id=session_id,
             metadata={
                 "responding_to": user_message.id,
-                "intent": intent.to_dict()
+                "intent_type": intent.type,
+                "next_action": intent.next_action,
+                "confidence": intent.confidence
             }
         )
-
-        # 7. Add AI message to conversation
         conversation.add_message(ai_message)
+
+        # 7. Update conversation metadata with resolved attributes
+        if intent.conversation_context.resolved_attributes:
+            conversation.metadata["resolved_attributes"] = intent.conversation_context.resolved_attributes
 
         # 8. Save conversation
         await self.conversation_repository.save(conversation)
@@ -452,7 +605,45 @@ class ProcessUserMessageUseCaseImpl(ProcessUserMessageUseCase):
         return MessageDTO.from_entity(ai_message)
 ```
 
-### 2.3 Chat Orchestrator Service
+### 2.3 Get Conversation Use Case
+
+```python
+# src/application/use_cases/get_conversation.py
+from typing import Optional, List
+from src.application.dto import ConversationDTO, MessageDTO
+from src.application.use_cases.interfaces import GetConversationUseCase
+
+class GetConversationUseCaseImpl(GetConversationUseCase):
+    """Implementation of get conversation use case"""
+
+    def __init__(self, conversation_repository):
+        self.conversation_repository = conversation_repository
+
+    async def execute(self, session_id: str) -> Optional[ConversationDTO]:
+        """Get conversation history for a session"""
+
+        # 1. Retrieve conversation from repository
+        conversation = await self.conversation_repository.get_by_session(session_id)
+
+        if not conversation:
+            return None
+
+        # 2. Convert to DTO
+        messages = [
+            MessageDTO.from_entity(msg)
+            for msg in conversation.messages
+        ]
+
+        return ConversationDTO(
+            session_id=conversation.session_id,
+            messages=messages,
+            metadata=conversation.metadata,
+            created_at=conversation.created_at,
+            updated_at=conversation.updated_at
+        )
+```
+
+### 2.4 Chat Orchestrator Service
 
 ```python
 # src/application/services/chat_orchestrator.py
@@ -527,97 +718,46 @@ class ChatOrchestrator:
             return None
 ```
 
-### 2.4 Query Analyzer Service
+### 2.5 Query Analyzer Port and Service
+
+```python
+# src/application/ports/query_analyzer_port.py
+from typing import Protocol, Optional, List
+from src.domain.value_objects import QueryIntent
+from src.application.dto import MessageDTO
+
+class QueryAnalyzerPort(Protocol):
+    """Port for query intent analysis"""
+
+    async def analyze(
+        self,
+        query: str,
+        conversation_context: Optional[List[MessageDTO]] = None
+    ) -> QueryIntent:
+        """Analyze query to determine intent"""
+        ...
+```
 
 ```python
 # src/application/services/query_analyzer.py
-import re
-from typing import List, Optional
+from typing import Optional, List
+from src.application.ports.query_analyzer_port import QueryAnalyzerPort
 from src.domain.value_objects import QueryIntent
+from src.application.dto import MessageDTO
 
 class QueryAnalyzer:
-    """Analyzes user queries to determine intent"""
+    """Application service for query analysis"""
 
-    # Indonesian product keywords
-    PRODUCT_KEYWORDS = [
-        "plat", "baja", "besi", "hollow", "pipa", "siku",
-        "beam", "wiremesh", "beton", "galvanis", "hitam"
-    ]
+    def __init__(self, analyzer_port: QueryAnalyzerPort):
+        self.analyzer_port = analyzer_port
 
-    PRICE_KEYWORDS = ["harga", "berapa", "price", "cost"]
-    STOCK_KEYWORDS = ["stok", "stock", "tersedia", "ada"]
-    SIZE_KEYWORDS = ["ukuran", "size", "dimensi", "tebal", "lebar", "panjang"]
-
-    async def analyze(self, query: str) -> QueryIntent:
-        """Analyze query to determine intent"""
-        query_lower = query.lower()
-
-        # Detect intent type
-        intent_type = self._detect_intent_type(query_lower)
-
-        # Extract product mentions
-        products = self._extract_products(query_lower)
-
-        # Extract quantities
-        quantity = self._extract_quantity(query_lower)
-
-        # Detect clarification needs
-        needs_clarification = self._needs_clarification(query_lower, products)
-
-        return QueryIntent(
-            type=intent_type,
-            products=products,
-            quantity=quantity,
-            needs_clarification=needs_clarification,
-            original_query=query
-        )
-
-    def _detect_intent_type(self, query: str) -> str:
-        """Detect the primary intent of the query"""
-        if any(word in query for word in self.PRICE_KEYWORDS):
-            return "price_inquiry"
-        elif any(word in query for word in self.STOCK_KEYWORDS):
-            return "stock_check"
-        elif any(word in query for word in self.SIZE_KEYWORDS):
-            return "specification_inquiry"
-        elif any(word in query for word in self.PRODUCT_KEYWORDS):
-            return "product_inquiry"
-        else:
-            return "general_inquiry"
-
-    def _extract_products(self, query: str) -> List[str]:
-        """Extract product mentions from query"""
-        products = []
-        for keyword in self.PRODUCT_KEYWORDS:
-            if keyword in query:
-                products.append(keyword)
-        return products
-
-    def _extract_quantity(self, query: str) -> Optional[int]:
-        """Extract quantity from query"""
-        # Look for patterns like "10 lembar", "5 batang", etc.
-        patterns = [
-            r'(\d+)\s*(?:lembar|batang|pcs|unit|kg|ton)',
-            r'(\d+)\s+(?:plat|baja|pipa|hollow)'
-        ]
-
-        for pattern in patterns:
-            match = re.search(pattern, query)
-            if match:
-                return int(match.group(1))
-        return None
-
-    def _needs_clarification(self, query: str, products: List[str]) -> List[str]:
-        """Determine what clarifications are needed"""
-        clarifications = []
-
-        if products and not any(word in query for word in ["ukuran", "size", "mm", "cm"]):
-            clarifications.append("size")
-
-        if "hollow" in products and "galvanis" not in query and "hitam" not in query:
-            clarifications.append("material_type")
-
-        return clarifications
+    async def analyze(
+        self,
+        query: str,
+        conversation_context: Optional[List[MessageDTO]] = None
+    ) -> QueryIntent:
+        """Delegate query analysis to infrastructure implementation"""
+        return await self.analyzer_port.analyze(query, conversation_context)
 ```
 
 ### Deliverables
@@ -908,12 +1048,129 @@ class MockRedisClient:
             del self.expiry[key]
 ```
 
+### 3.5 Mock Query Analyzer
+
+```python
+# src/infrastructure/mocks/mock_query_analyzer.py
+from typing import Dict, Any, Optional, List
+from src.application.ports import QueryAnalyzerPort
+from src.domain.value_objects import QueryIntent, ClarificationNeeded, ConversationContext
+
+class MockQueryAnalyzer(QueryAnalyzerPort):
+    """Mock query analyzer for testing and development"""
+
+    def __init__(self):
+        # Predefined patterns for mock intent analysis
+        self.patterns = {
+            "product_inquiry": [
+                "plat", "hollow", "besi", "pipa", "profil",
+                "siku", "unp", "wf", "h-beam", "cnp"
+            ],
+            "price_check": [
+                "harga", "price", "berapa", "cost", "biaya"
+            ],
+            "availability_check": [
+                "stok", "stock", "tersedia", "ada", "available"
+            ],
+            "variant_selection": [
+                "ukuran", "size", "tebal", "thickness", "dimensi"
+            ]
+        }
+
+    async def analyze_intent(
+        self,
+        query: str,
+        context: Optional[Dict[str, Any]] = None
+    ) -> QueryIntent:
+        """Analyze query intent using pattern matching for mock implementation"""
+        query_lower = query.lower()
+
+        # Determine query type based on patterns
+        query_type = "general"
+        detected_attributes = {}
+        confidence = 0.5
+
+        # Check for product inquiries
+        for product in self.patterns["product_inquiry"]:
+            if product in query_lower:
+                query_type = "product_inquiry"
+                detected_attributes["product_type"] = product
+                confidence = 0.8
+                break
+
+        # Check for price queries
+        if any(word in query_lower for word in self.patterns["price_check"]):
+            if query_type == "product_inquiry":
+                query_type = "price_check"
+                confidence = 0.9
+            else:
+                query_type = "price_check"
+                confidence = 0.7
+
+        # Check for availability
+        if any(word in query_lower for word in self.patterns["availability_check"]):
+            if query_type == "product_inquiry":
+                query_type = "availability_check"
+                confidence = 0.9
+            else:
+                query_type = "availability_check"
+                confidence = 0.7
+
+        # Check for variant selection
+        if any(word in query_lower for word in self.patterns["variant_selection"]):
+            query_type = "variant_selection"
+            confidence = 0.85
+
+        # Create mock conversation context
+        conversation_context = ConversationContext(
+            resolved_attributes=detected_attributes,
+            pending_clarifications=[],
+            conversation_history=[],
+            attribute_confidence={"product_type": confidence} if "product_type" in detected_attributes else {}
+        )
+
+        # Determine clarification stage based on context
+        clarification_stage = "initial"
+        if context and context.get("conversation_turn", 1) > 1:
+            if detected_attributes:
+                clarification_stage = "narrowing"
+            if confidence > 0.85:
+                clarification_stage = "confirming"
+
+        # Create QueryIntent
+        return QueryIntent(
+            type=query_type,
+            clarification_stage=clarification_stage,
+            query_level="product" if query_type == "product_inquiry" else "ambiguous",
+            conversation_context=conversation_context,
+            conversation_turn=context.get("conversation_turn", 1) if context else 1,
+            next_action="provide_info" if confidence > 0.8 else "request_clarification",
+            original_query=query,
+            current_query=query,
+            detected_attributes=detected_attributes,
+            confidence=confidence,
+            requires_human_intervention=False,
+            product_name=detected_attributes.get("product_type"),
+            quantity=self._extract_quantity(query_lower)
+        )
+
+    def _extract_quantity(self, query: str) -> Optional[int]:
+        """Extract quantity from query if present"""
+        import re
+        numbers = re.findall(r'\d+', query)
+        if numbers:
+            # Simple heuristic: return first number found
+            return int(numbers[0])
+        return None
+```
+
 ### Deliverables
 
 - ✅ Mock AI agent with Indonesian responses
 - ✅ Mock product repository with sample data
 - ✅ In-memory conversation storage
 - ✅ Mock Redis client
+- ✅ Mock query analyzer for development
 
 ---
 
@@ -1268,63 +1525,169 @@ async def websocket_endpoint(
 - Implement PIM tools
 - Test complete flow
 
-### 5.1 PydanticAI Agent Configuration
+### 5.1 Dual-Agent Architecture with PydanticAI
+
+#### 5.1.1 LLM Query Analyzer Implementation
 
 ```python
-# src/infrastructure/ai/pydantic_agent.py
+# src/infrastructure/ai/llm_query_analyzer.py
+from typing import List, Optional
+from pydantic_ai import Agent
+from src.application.ports.query_analyzer_port import QueryAnalyzerPort
+from src.domain.value_objects import QueryIntent, ConversationContext
+from src.application.dto import MessageDTO
+import logging
+
+logger = logging.getLogger(__name__)
+
+class LLMQueryAnalyzer(QueryAnalyzerPort):
+    """LLM-powered query intent analyzer using PydanticAI"""
+
+    INTENT_ANALYSIS_PROMPT = """
+    You are a query intent analyzer for SMS Perkasa steel products B2B marketplace.
+    Analyze user queries in Indonesian/English and return structured intent classification.
+
+    Context:
+    - B2B steel products: plat (plates), hollow, pipa (pipes), besi beton (rebar), etc.
+    - Users typically ask about: products, prices, availability, specifications
+    - Multi-turn conversations often needed to clarify exact requirements
+    - Indonesian market with mixed Indonesian/English terminology
+
+    Your task:
+    1. Classify intent type (product_inquiry, price_check, availability_check, variant_selection, general)
+    2. Extract product mentions and attributes (dimensions, material, thickness)
+    3. Determine clarification stage (initial, narrowing, confirming, complete)
+    4. Identify what clarifications are needed
+    5. Assess confidence in your classification
+
+    Consider conversation context for multi-turn understanding.
+    Return structured QueryIntent with all required fields.
+    """
+
+    def __init__(self, openai_api_key: str):
+        self.agent = Agent(
+            model="gpt-4o-mini",
+            system_prompt=self.INTENT_ANALYSIS_PROMPT,
+            result_type=QueryIntent,
+            temperature=0.1,
+            max_retries=2
+        )
+
+    async def analyze(
+        self,
+        query: str,
+        conversation_context: Optional[List[MessageDTO]] = None
+    ) -> QueryIntent:
+        """Analyze query using LLM to determine intent"""
+        try:
+            context_str = ""
+            if conversation_context:
+                context_str = "Previous conversation:\n"
+                for msg in conversation_context[-3:]:
+                    context_str += f"{msg.sender_type}: {msg.content}\n"
+
+            analysis_input = {
+                "query": query,
+                "context": context_str if context_str else "No previous context"
+            }
+
+            result = await self.agent.run(analysis_input)
+            intent = result.data
+
+            intent = self._post_process_intent(intent, query)
+            logger.info(f"Query intent analyzed: {intent.type} with confidence {intent.confidence}")
+            return intent
+
+        except Exception as e:
+            logger.error(f"LLM intent analysis failed: {e}")
+            return self._create_fallback_intent(query)
+
+    def _post_process_intent(self, intent: QueryIntent, original_query: str) -> QueryIntent:
+        """Post-process LLM output for consistency"""
+        if not intent.original_query:
+            intent.original_query = original_query
+        if not intent.current_query:
+            intent.current_query = original_query
+
+        if not intent.conversation_context:
+            intent.conversation_context = ConversationContext()
+
+        if intent.clarification_stage == "initial" and not intent.matched_products:
+            intent.next_action = "request_clarification"
+        elif intent.clarification_stage == "complete":
+            intent.next_action = "provide_info"
+        elif intent.clarification_stage == "confirming":
+            intent.next_action = "confirm_selection"
+
+        return intent
+
+    def _create_fallback_intent(self, query: str) -> QueryIntent:
+        """Create basic fallback intent when LLM fails"""
+        return QueryIntent(
+            type="general",
+            clarification_stage="initial",
+            query_level="ambiguous",
+            conversation_context=ConversationContext(),
+            next_action="request_clarification",
+            original_query=query,
+            current_query=query,
+            confidence=0.3
+        )
+```
+
+#### 5.1.2 LLM Response Generator Implementation
+
+```python
+# src/infrastructure/ai/llm_response_agent.py
 from pydantic_ai import Agent
 from typing import List, Optional
 import logging
 from src.application.ports import AIAgentPort
-from src.domain.value_objects import ProductInfo, VariantInfo
+from src.domain.value_objects import QueryIntent
+from src.application.dto import MessageDTO
 
 logger = logging.getLogger(__name__)
 
-class SteelProductAgent(AIAgentPort):
-    """PydanticAI agent for steel product inquiries"""
+class LLMResponseAgent(AIAgentPort):
+    """LLM-powered response generator using PydanticAI"""
+
+    RESPONSE_GENERATION_PROMPT = """
+    You are PERKY, AI assistant for SMS Perkasa steel products, helping B2B customers in Indonesia.
+
+    IMPORTANT INSTRUCTIONS:
+    1. ALWAYS respond in Indonesian unless the user writes in English
+    2. Use professional yet friendly language
+    3. Understand local steel terminology (plat, besi beton, hollow, etc.)
+    4. Provide accurate product, price, and stock information
+    5. Clearly state if information is unavailable
+
+    RESPONSE FORMAT:
+    - Polite greeting
+    - Product information (name, SKU, specifications)
+    - Price and stock availability
+    - Offer for further assistance
+
+    Use the query intent analysis to guide your response:
+    - For product_inquiry: Focus on product details and specifications
+    - For price_check: Emphasize pricing information
+    - For availability_check: Highlight stock levels
+    - For clarification requests: Ask specific questions to narrow down requirements
+    """
 
     def __init__(self, product_service, openai_api_key: str):
         self.product_service = product_service
 
-        # System prompt in Indonesian
-        self.system_prompt = """
-Anda adalah PERKY, AI asisten spesialis produk baja dari SMS Perkasa, yang membantu pelanggan B2B Indonesia.
-
-PETUNJUK PENTING:
-1. SELALU jawab dalam Bahasa Indonesia, kecuali user bertanya dalam bahasa Inggris
-2. Gunakan bahasa yang profesional namun ramah
-3. Pahami istilah lokal/slang untuk produk baja (misal: "plat", "besi beton", "hollow")
-4. Berikan informasi akurat tentang produk, harga, dan stok
-5. Jika data tidak tersedia, informasikan dengan jelas
-
-FORMAT JAWABAN:
-- Salam pembuka yang sopan
-- Informasi produk yang diminta (nama, SKU, spesifikasi)
-- Harga dan ketersediaan stok
-- Tawaran bantuan lebih lanjut
-
-CONTOH:
-"Selamat pagi Pak/Bu! Untuk plat baja 5mm yang Bapak/Ibu tanyakan:
-- Produk: Plat Hitam SS400 5mm x 4ft x 8ft
-- SKU: PLT-5MM-SS400
-- Harga: Rp 125.000/lembar
-- Stok: Tersedia (150 lembar)
-Ada yang bisa saya bantu lagi?"
-"""
-
-        # Initialize PydanticAI agent
         self.agent = Agent(
             model="gpt-4o-mini",
-            system_prompt=self.system_prompt,
+            system_prompt=self.RESPONSE_GENERATION_PROMPT,
             temperature=0.3,
             max_retries=2
         )
 
-        # Register tools
         self._register_tools()
 
     def _register_tools(self):
-        """Register agent tools"""
+        """Register product-related tools for the agent"""
 
         @self.agent.tool
         async def search_products(query: str) -> List[dict]:
@@ -1393,26 +1756,39 @@ Ada yang bisa saya bantu lagi?"
     async def generate_response(
         self,
         message: str,
-        conversation_context: Optional[List] = None
+        conversation_context: Optional[List[MessageDTO]] = None,
+        query_intent: Optional[QueryIntent] = None
     ) -> str:
-        """Generate AI response"""
+        """Generate AI response based on message and intent"""
         try:
-            # Build context string
             context = ""
             if conversation_context:
                 context = "\n".join([
                     f"{msg.sender_type}: {msg.content}"
-                    for msg in conversation_context[-3:]  # Last 3 messages
+                    for msg in conversation_context[-3:]
                 ])
 
-            # Generate response
-            full_message = f"{context}\nUser: {message}" if context else message
-            result = await self.agent.run(full_message)
+            intent_info = ""
+            if query_intent:
+                intent_info = f"""
+                Intent Type: {query_intent.type}
+                Clarification Stage: {query_intent.clarification_stage}
+                Next Action: {query_intent.next_action}
+                Detected Products: {query_intent.matched_products}
+                Confidence: {query_intent.confidence}
+                """
 
+            full_input = {
+                "message": message,
+                "context": context,
+                "intent": intent_info
+            }
+
+            result = await self.agent.run(full_input)
             return result.data
 
         except Exception as e:
-            logger.error(f"AI generation error: {e}")
+            logger.error(f"Response generation error: {e}")
             return "Maaf, terjadi kesalahan sistem. Silakan coba beberapa saat lagi."
 ```
 
@@ -1441,12 +1817,47 @@ from src.core.config import settings
 def get_container():
     """Get configured DI container"""
 
-    # Register infrastructure services (mocks for MVP)
+    # Register infrastructure services
     container.register("redis_client", MockRedisClient, singleton=True)
     container.register("product_repository", MockProductRepository, singleton=True)
     container.register("conversation_repository", MockConversationRepository, singleton=True)
-    container.register("ai_agent", MockAIAgent, singleton=True)
-    container.register("query_analyzer", QueryAnalyzer, singleton=True)
+
+    # Register LLM-based implementations (use mocks if OpenAI key not available)
+    if settings.OPENAI_API_KEY:
+        # Production: LLM-based dual agents
+        from src.infrastructure.ai import LLMQueryAnalyzer, LLMResponseAgent
+
+        container.register(
+            "query_analyzer_port",
+            lambda: LLMQueryAnalyzer(settings.OPENAI_API_KEY),
+            singleton=True
+        )
+
+        container.register(
+            "ai_agent",
+            lambda: LLMResponseAgent(
+                product_service=container.resolve("product_repository"),
+                openai_api_key=settings.OPENAI_API_KEY
+            ),
+            singleton=True
+        )
+    else:
+        # Development: Mock implementations
+        container.register("ai_agent", MockAIAgent, singleton=True)
+        container.register(
+            "query_analyzer_port",
+            MockQueryAnalyzer,  # Need to create mock that implements port
+            singleton=True
+        )
+
+    # Register application services
+    container.register(
+        "query_analyzer",
+        lambda: QueryAnalyzer(
+            analyzer_port=container.resolve("query_analyzer_port")
+        ),
+        singleton=True
+    )
 
     # Register use cases
     container.register(
@@ -1797,6 +2208,368 @@ docker run -p 8000:8000 steel-chat-mvp
 
 ---
 
+## Phase 6: LLM Testing Strategy
+
+### Objectives
+
+- Define testing approach for LLM components
+- Create test fixtures for AI agents
+- Implement deterministic testing patterns
+- Setup cost monitoring
+
+### 6.1 LLM Component Testing Approaches
+
+```python
+# tests/integration/test_llm_agents.py
+import pytest
+from unittest.mock import AsyncMock, patch
+from src.infrastructure.llm import LLMQueryAnalyzer, LLMResponseAgent
+from src.domain.value_objects import QueryIntent
+
+class TestLLMQueryAnalyzer:
+    """Test strategies for LLM Query Analyzer"""
+
+    @pytest.fixture
+    def mock_openai_client(self):
+        """Mock OpenAI client for deterministic testing"""
+        mock = AsyncMock()
+        mock.chat.completions.create.return_value = AsyncMock(
+            choices=[AsyncMock(
+                message=AsyncMock(
+                    content='{"type": "product_inquiry", "confidence": 0.9}'
+                )
+            )]
+        )
+        return mock
+
+    @pytest.mark.asyncio
+    async def test_intent_analysis_with_mock(self, mock_openai_client):
+        """Test intent analysis with mocked responses"""
+        analyzer = LLMQueryAnalyzer(client=mock_openai_client)
+
+        intent = await analyzer.analyze_intent(
+            query="I need steel plates",
+            context={}
+        )
+
+        assert intent.type == "product_inquiry"
+        assert intent.confidence >= 0.8
+
+    @pytest.mark.asyncio
+    @pytest.mark.integration  # Run only in integration tests
+    async def test_intent_analysis_with_real_api(self):
+        """Test with real API (expensive, run sparingly)"""
+        analyzer = LLMQueryAnalyzer()  # Uses real client
+
+        test_queries = [
+            ("harga plat baja 5mm", "price_check"),
+            ("stok hollow galvanis", "availability_check"),
+            ("saya butuh besi siku", "product_inquiry")
+        ]
+
+        for query, expected_type in test_queries:
+            intent = await analyzer.analyze_intent(query)
+            assert intent.type == expected_type
+```
+
+### 6.2 Cost-Effective Testing Patterns
+
+```python
+# tests/fixtures/llm_fixtures.py
+import json
+from typing import Dict, Any
+
+class LLMTestFixtures:
+    """Reusable test fixtures for LLM testing"""
+
+    @staticmethod
+    def get_sample_intents() -> Dict[str, QueryIntent]:
+        """Pre-analyzed intents for common queries"""
+        return {
+            "greeting": QueryIntent(
+                type="general",
+                confidence=0.95,
+                original_query="hello",
+                current_query="hello",
+                clarification_stage="initial",
+                query_level="ambiguous",
+                next_action="provide_info"
+            ),
+            "product_inquiry": QueryIntent(
+                type="product_inquiry",
+                confidence=0.85,
+                original_query="I need steel plates",
+                current_query="I need steel plates",
+                clarification_stage="narrowing",
+                query_level="product",
+                next_action="request_clarification",
+                product_name="steel plates"
+            )
+        }
+
+    @staticmethod
+    def get_mock_responses() -> Dict[str, str]:
+        """Mock AI responses for testing"""
+        return {
+            "greeting": "Selamat datang di SMS Perkasa! Ada yang bisa saya bantu?",
+            "product_info": "Untuk plat baja, kami memiliki berbagai ukuran...",
+            "clarification": "Bisa tolong sebutkan ukuran yang Anda butuhkan?"
+        }
+```
+
+### 6.3 Testing Environment Configuration
+
+```yaml
+# tests/config/test_config.yaml
+llm_testing:
+  use_mocks: true  # Default to mocks for unit tests
+  real_api_tests: false  # Enable for integration tests only
+  max_test_cost_usd: 1.00  # Maximum cost per test run
+  cache_responses: true  # Cache real API responses for reuse
+
+  test_modes:
+    unit:
+      use_mocks: true
+      timeout_seconds: 5
+    integration:
+      use_mocks: false
+      timeout_seconds: 30
+      rate_limit: 10  # requests per minute
+
+  mock_response_patterns:
+    - pattern: "price|harga"
+      intent_type: "price_check"
+      confidence: 0.9
+    - pattern: "stock|stok"
+      intent_type: "availability_check"
+      confidence: 0.85
+```
+
+---
+
+## Phase 7: Fallback Mechanisms and Error Recovery
+
+### Objectives
+
+- Implement graceful degradation
+- Add circuit breaker patterns
+- Create fallback responses
+- Setup monitoring and alerting
+
+### 7.1 API Failure Fallback Strategy
+
+```python
+# src/infrastructure/llm/fallback_handler.py
+from typing import Optional, Dict, Any
+import logging
+from datetime import datetime, timedelta
+from src.domain.value_objects import QueryIntent
+
+logger = logging.getLogger(__name__)
+
+class LLMFallbackHandler:
+    """Handles failures and provides fallback mechanisms"""
+
+    def __init__(self):
+        self.failure_count = 0
+        self.last_failure_time = None
+        self.circuit_open = False
+        self.circuit_open_until = None
+
+    def check_circuit_breaker(self) -> bool:
+        """Check if circuit breaker is open"""
+        if self.circuit_open and self.circuit_open_until:
+            if datetime.now() > self.circuit_open_until:
+                # Try to close circuit
+                self.circuit_open = False
+                self.failure_count = 0
+                logger.info("Circuit breaker closed, retrying API")
+        return self.circuit_open
+
+    def record_failure(self):
+        """Record API failure and potentially open circuit"""
+        self.failure_count += 1
+        self.last_failure_time = datetime.now()
+
+        if self.failure_count >= 3:
+            # Open circuit breaker for 5 minutes
+            self.circuit_open = True
+            self.circuit_open_until = datetime.now() + timedelta(minutes=5)
+            logger.warning(f"Circuit breaker opened until {self.circuit_open_until}")
+
+    def get_fallback_intent(self, query: str) -> QueryIntent:
+        """Generate fallback intent using pattern matching"""
+        logger.warning("Using fallback intent analysis")
+
+        # Simple pattern-based fallback
+        query_lower = query.lower()
+
+        if any(word in query_lower for word in ["harga", "price", "cost"]):
+            intent_type = "price_check"
+        elif any(word in query_lower for word in ["stok", "stock", "available"]):
+            intent_type = "availability_check"
+        elif any(word in query_lower for word in ["plat", "hollow", "besi", "pipa"]):
+            intent_type = "product_inquiry"
+        else:
+            intent_type = "general"
+
+        return QueryIntent(
+            type=intent_type,
+            confidence=0.5,  # Lower confidence for fallback
+            original_query=query,
+            current_query=query,
+            clarification_stage="initial",
+            query_level="ambiguous",
+            next_action="request_clarification",
+            requires_human_intervention=True  # Flag for human review
+        )
+
+    def get_fallback_response(self, message: str, intent: Optional[QueryIntent] = None) -> str:
+        """Generate fallback response when AI agent fails"""
+        logger.warning("Using fallback response generation")
+
+        if intent and intent.type == "product_inquiry":
+            return (
+                "Mohon maaf, sistem kami sedang mengalami gangguan. "
+                "Untuk informasi produk, silakan hubungi customer service kami "
+                "di nomor 021-1234567 atau email ke sales@smsperkasa.com"
+            )
+        elif intent and intent.type == "price_check":
+            return (
+                "Mohon maaf, sistem harga sedang tidak dapat diakses. "
+                "Untuk informasi harga terkini, silakan hubungi tim sales kami."
+            )
+        else:
+            return (
+                "Mohon maaf, sistem sedang mengalami gangguan teknis. "
+                "Silakan coba beberapa saat lagi atau hubungi customer service kami."
+            )
+```
+
+### 7.2 Enhanced LLM Agents with Fallback
+
+```python
+# src/infrastructure/llm/query_analyzer_with_fallback.py
+from typing import Optional, Dict, Any
+from src.application.ports import QueryAnalyzerPort
+from src.infrastructure.llm import LLMQueryAnalyzer
+from src.infrastructure.llm.fallback_handler import LLMFallbackHandler
+from src.infrastructure.mocks import MockQueryAnalyzer
+
+class ResilientQueryAnalyzer(QueryAnalyzerPort):
+    """Query analyzer with fallback mechanisms"""
+
+    def __init__(self, primary_analyzer=None, use_mock_fallback=True):
+        self.primary = primary_analyzer or LLMQueryAnalyzer()
+        self.fallback_handler = LLMFallbackHandler()
+        self.mock_analyzer = MockQueryAnalyzer() if use_mock_fallback else None
+
+    async def analyze_intent(
+        self,
+        query: str,
+        context: Optional[Dict[str, Any]] = None
+    ) -> QueryIntent:
+        """Analyze with automatic fallback on failure"""
+
+        # Check circuit breaker
+        if self.fallback_handler.check_circuit_breaker():
+            # Circuit is open, use fallback directly
+            return await self._use_fallback(query, context)
+
+        try:
+            # Try primary LLM analyzer
+            return await self.primary.analyze_intent(query, context)
+
+        except Exception as e:
+            logger.error(f"Primary analyzer failed: {e}")
+            self.fallback_handler.record_failure()
+
+            # Use fallback mechanism
+            return await self._use_fallback(query, context)
+
+    async def _use_fallback(self, query: str, context: Optional[Dict[str, Any]]) -> QueryIntent:
+        """Use fallback mechanism"""
+        if self.mock_analyzer:
+            # Try mock analyzer first
+            try:
+                return await self.mock_analyzer.analyze_intent(query, context)
+            except:
+                pass
+
+        # Last resort: pattern-based fallback
+        return self.fallback_handler.get_fallback_intent(query)
+```
+
+### 7.3 Monitoring and Alerting Configuration
+
+```python
+# src/infrastructure/monitoring/llm_monitor.py
+from typing import Dict, Any
+import logging
+from datetime import datetime
+from collections import deque
+
+logger = logging.getLogger(__name__)
+
+class LLMMonitor:
+    """Monitor LLM service health and performance"""
+
+    def __init__(self, window_size: int = 100):
+        self.api_calls = deque(maxlen=window_size)
+        self.failures = deque(maxlen=window_size)
+        self.response_times = deque(maxlen=window_size)
+        self.fallback_uses = 0
+
+    def record_api_call(self, success: bool, response_time_ms: float, used_fallback: bool = False):
+        """Record API call metrics"""
+        self.api_calls.append({
+            "timestamp": datetime.now(),
+            "success": success,
+            "response_time_ms": response_time_ms,
+            "used_fallback": used_fallback
+        })
+
+        if not success:
+            self.failures.append(datetime.now())
+
+        if used_fallback:
+            self.fallback_uses += 1
+
+        self.response_times.append(response_time_ms)
+
+        # Check for alerting conditions
+        self._check_alert_conditions()
+
+    def _check_alert_conditions(self):
+        """Check if alert conditions are met"""
+        if len(self.failures) >= 5:
+            # 5 failures in window
+            logger.critical(f"HIGH FAILURE RATE: {len(self.failures)} failures in last {len(self.api_calls)} calls")
+
+        if self.response_times and sum(self.response_times) / len(self.response_times) > 5000:
+            # Average response time > 5 seconds
+            logger.warning(f"SLOW API RESPONSE: Average {sum(self.response_times) / len(self.response_times):.0f}ms")
+
+        if self.fallback_uses > 10:
+            # High fallback usage
+            logger.warning(f"HIGH FALLBACK USAGE: {self.fallback_uses} fallback responses used")
+
+    def get_health_status(self) -> Dict[str, Any]:
+        """Get current health status"""
+        total_calls = len(self.api_calls)
+        successful_calls = sum(1 for call in self.api_calls if call["success"])
+
+        return {
+            "status": "healthy" if successful_calls / max(total_calls, 1) > 0.8 else "degraded",
+            "success_rate": successful_calls / max(total_calls, 1),
+            "average_response_time_ms": sum(self.response_times) / max(len(self.response_times), 1),
+            "fallback_uses": self.fallback_uses,
+            "recent_failures": len(self.failures)
+        }
+```
+
+---
+
 ## Appendix A: File Structure
 
 ```text
@@ -1812,7 +2585,7 @@ src/
 │   │   ├── __init__.py
 │   │   ├── interfaces.py
 │   │   ├── start_chat_session.py
-│   │   ├── process_user_message.py
+│   │   ├── process_message.py
 │   │   └── get_conversation.py
 │   ├── services/
 │   │   ├── __init__.py
@@ -1821,6 +2594,7 @@ src/
 │   ├── ports/
 │   │   ├── __init__.py
 │   │   ├── ai_agent_port.py
+│   │   ├── query_analyzer_port.py
 │   │   └── product_service_port.py
 │   └── container.py
 ├── infrastructure/
