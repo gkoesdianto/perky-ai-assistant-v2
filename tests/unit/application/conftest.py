@@ -1,20 +1,24 @@
 """Centralized fixtures for application layer tests."""
 
-import pytest
-from typing import Dict, Any, Optional, List
-from unittest.mock import AsyncMock
 from datetime import datetime, timezone
 from decimal import Decimal
+from typing import Any, Dict, List, Optional
+from unittest.mock import AsyncMock
 
-from src.application.dto.session_dto import SessionDTO
-from src.application.dto.message_dto import MessageDTO
+import pytest
+
 from src.application.dto.conversation_dto import ConversationDTO
+from src.application.dto.message_dto import MessageDTO
+from src.application.dto.session_dto import SessionDTO
 from src.application.use_cases.interfaces import (
-    StartChatSessionUseCase,
-    ProcessUserMessageUseCase,
     GetConversationUseCase,
+    ProcessUserMessageUseCase,
+    StartChatSessionUseCase,
 )
 from src.domain.value_objects import ProductInfo, ProductWithVariantsInfo, VariantInfo
+
+# Import mock implementations
+from tests.unit.application.mocks import MockRedisAdapter, MockRedisClient
 
 
 # Mock Use Case Implementations
@@ -225,7 +229,7 @@ def sample_conversation_context():
             metadata={},
         ),
         MessageDTO(
-            content="Baik, kami memiliki plat baja 10mm. Berapa lembar yang Anda butuhkan?",
+            content="Baik, kami punya plat baja 10mm. Berapa lembar yang dibutuhkan?",
             sender_type="ai_agent",
             session_id="session-123",
             conversation_id="conv-1",
@@ -290,3 +294,66 @@ def sample_product_with_variants(sample_product_info, sample_variant_info):
     return ProductWithVariantsInfo(
         product=sample_product_info, variants=[sample_variant_info, variant2]
     )
+
+
+# Redis Mock Fixtures
+@pytest.fixture
+def mock_redis_client():
+    """
+    Create a mock Redis client for testing.
+
+    Returns:
+        MockRedisClient: A mock Redis client with storage and TTL support
+    """
+    return MockRedisClient()
+
+
+@pytest.fixture
+def mock_redis_adapter(mock_redis_client):
+    """
+    Create a mock Redis adapter that matches the RedisClient interface.
+
+    Args:
+        mock_redis_client: The underlying mock Redis client
+
+    Returns:
+        MockRedisAdapter: An adapter matching the RedisClient interface
+    """
+    return MockRedisAdapter(mock_redis_client)
+
+
+@pytest.fixture
+def mock_redis_with_existing_session(mock_redis_adapter):
+    """
+    Create a mock Redis adapter with a pre-existing session.
+
+    This fixture is useful for testing scenarios where a session
+    already exists in Redis.
+
+    Returns:
+        tuple: (MockRedisAdapter, session_data) for testing
+    """
+    import json
+
+    session_data = {
+        "session_id": "existing-session-123",
+        "conversation_id": "conv-456",
+        "started_at": "2024-01-15T10:00:00+00:00",
+        "last_activity": "2024-01-15T10:30:00+00:00",
+        "is_active": True,
+        "metadata": {"source": "test", "user_agent": "test-browser"},
+    }
+
+    # Pre-populate the mock with existing session
+    async def setup():
+        client = await mock_redis_adapter.get_client()
+        await client.setex(
+            f"session:{session_data['session_id']}", 3600, json.dumps(session_data)
+        )
+
+    # Run the async setup
+    import asyncio
+
+    asyncio.run(setup())
+
+    return mock_redis_adapter, session_data
