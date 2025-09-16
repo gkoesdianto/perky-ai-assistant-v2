@@ -13,11 +13,20 @@ class MessageDTO:
     metadata: Dict[str, Any] = field(default_factory=dict)
 
     @classmethod
-    def from_entity(cls, message) -> "MessageDTO":
+    def from_entity(cls, message, session_id: str = None) -> "MessageDTO":
+        """Convert Message entity to MessageDTO.
+
+        Args:
+            message: The Message entity to convert
+            session_id: The session ID (Message entity doesn't have this field)
+
+        Returns:
+            MessageDTO instance
+        """
         return cls(
             content=message.content,
             sender_type=message.sender_type,
-            session_id=message.session_id,
+            session_id=session_id or "",  # Message entity doesn't have session_id
             conversation_id=message.conversation_id,
             timestamp=message.created_at,
             metadata=message.metadata or {},

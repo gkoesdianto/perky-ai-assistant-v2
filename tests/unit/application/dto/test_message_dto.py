@@ -11,7 +11,6 @@ from src.application.dto import MessageDTO
 class MockMessage:
     content: str
     sender_type: str
-    session_id: str
     conversation_id: Optional[str]
     created_at: datetime
     metadata: Optional[Dict[str, Any]]
@@ -57,13 +56,12 @@ class TestMessageDTO:
         entity = MockMessage(
             content="Entity message",
             sender_type="user",
-            session_id="session-001",
             conversation_id="conv-002",
             created_at=now,
             metadata=metadata,
         )
 
-        dto = MessageDTO.from_entity(entity)
+        dto = MessageDTO.from_entity(entity, session_id="session-001")
 
         assert dto.content == "Entity message"
         assert dto.sender_type == "user"
@@ -78,13 +76,12 @@ class TestMessageDTO:
         entity = MockMessage(
             content="No metadata",
             sender_type="ai_agent",
-            session_id="session-003",
             conversation_id=None,
             created_at=now,
             metadata=None,
         )
 
-        dto = MessageDTO.from_entity(entity)
+        dto = MessageDTO.from_entity(entity, session_id="session-003")
 
         assert dto.content == "No metadata"
         assert dto.sender_type == "ai_agent"
