@@ -134,3 +134,8 @@ Settings managed via Pydantic Settings in `src/core/config.py`:
 - Validation for all configuration values
 - Environment variables loaded from `.env` file
 - Separate settings for security, API integration, WebSocket, and caching
+
+## Task Master AI Instructions
+
+**Import Task Master's development workflow commands and guidelines, treat as if import is in the main CLAUDE.md file.**
+@./.taskmaster/CLAUDE.md
