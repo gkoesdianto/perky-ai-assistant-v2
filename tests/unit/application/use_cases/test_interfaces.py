@@ -3,9 +3,9 @@
 import pytest
 
 from src.application.use_cases.interfaces import (
-    StartChatSessionUseCase,
-    ProcessUserMessageUseCase,
     GetConversationUseCase,
+    ProcessUserMessageUseCase,
+    StartChatSessionUseCase,
 )
 
 
@@ -156,9 +156,7 @@ class TestGetConversationUseCase:
             "non-existent-session"
         )
 
-    async def test_call_tracking(
-        self, mock_get_conversation, sample_conversation_dto
-    ):
+    async def test_call_tracking(self, mock_get_conversation, sample_conversation_dto):
         """Test that mock tracks calls properly."""
         mock_get_conversation.execute_mock.return_value = sample_conversation_dto
 

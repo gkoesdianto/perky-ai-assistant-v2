@@ -3,13 +3,14 @@ Unit tests for QueryAnalyzerPort protocol.
 Tests the protocol contract using mock implementations from conftest.
 """
 
-import pytest
 from unittest.mock import AsyncMock
 
+import pytest
+
 from src.domain.value_objects.query_intent import (
-    QueryIntent,
-    ConversationContext,
     ClarificationNeeded,
+    ConversationContext,
+    QueryIntent,
 )
 from tests.unit.domain.factories import QueryIntentFactory
 

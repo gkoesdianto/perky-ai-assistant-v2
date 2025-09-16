@@ -16,7 +16,11 @@ from src.application.use_cases.interfaces import (
     StartChatSessionUseCase,
 )
 from src.domain.value_objects import ProductInfo, ProductWithVariantsInfo, VariantInfo
-from src.domain.value_objects.query_intent import QueryIntent, ConversationContext, ClarificationNeeded
+from src.domain.value_objects.query_intent import (
+    ClarificationNeeded,
+    ConversationContext,
+    QueryIntent,
+)
 
 # Import mock implementations
 from tests.unit.application.mocks import MockRedisAdapter, MockRedisClient
@@ -390,6 +394,77 @@ def mock_redis_with_existing_session(mock_redis_adapter):
     return mock_redis_adapter, session_data
 
 
+# Query Analyzer Service Fixtures
+@pytest.fixture
+def query_analyzer_service(mock_query_analyzer):
+    """Create a QueryAnalyzerService instance with mock dependencies."""
+    from src.application.services.query_analyzer import QueryAnalyzerService
+
+    return QueryAnalyzerService(query_analyzer=mock_query_analyzer)
+
+
+@pytest.fixture
+def sample_query_analyzer_messages():
+    """Create sample message DTOs for query analyzer testing."""
+    return [
+        MessageDTO(
+            content="Saya mencari besi hollow",
+            sender_type="user",
+            session_id="session-123",
+            conversation_id="conv-456",
+            timestamp=datetime(2024, 1, 1, 10, 0, 0, tzinfo=timezone.utc),
+        ),
+        MessageDTO(
+            content=(
+                "Kami memiliki berbagai ukuran besi hollow. "
+                "Ukuran apa yang Anda cari?"
+            ),
+            sender_type="ai_agent",
+            session_id="session-123",
+            conversation_id="conv-456",
+            timestamp=datetime(2024, 1, 1, 10, 0, 10, tzinfo=timezone.utc),
+        ),
+        MessageDTO(
+            content="Yang ukuran 4x4",
+            sender_type="user",
+            session_id="session-123",
+            conversation_id="conv-456",
+            timestamp=datetime(2024, 1, 1, 10, 0, 20, tzinfo=timezone.utc),
+        ),
+    ]
+
+
+@pytest.fixture
+def sample_query_intent_with_clarification():
+    """Create a sample QueryIntent with clarification needed for testing."""
+    return QueryIntent(
+        type="product_inquiry",
+        clarification_stage="narrowing",
+        query_level="variant",
+        conversation_context=ConversationContext(
+            resolved_attributes={
+                "product_type": "besi_hollow",
+                "dimensions": "4x4",
+            },
+            pending_clarifications=[
+                ClarificationNeeded(
+                    attribute_type="thickness",
+                    question_template="Berapa ketebalan yang Anda butuhkan?",
+                    options=["1.2mm", "1.4mm", "1.8mm", "2.0mm"],
+                    priority=1,
+                )
+            ],
+        ),
+        next_action="request_clarification",
+        original_query="Yang ukuran 4x4",
+        current_query="besi hollow ukuran 4x4",
+        detected_attributes={"dimensions": "4x4"},
+        confidence=0.85,
+        matched_products=["PROD-001", "PROD-002"],
+        possible_variants=["VAR-001", "VAR-002", "VAR-003"],
+    )
+
+
 # Query Intent Fixtures
 @pytest.fixture
 def sample_query_intent_product():
@@ -400,7 +475,7 @@ def sample_query_intent_product():
         query_level="product",
         conversation_context=ConversationContext(
             resolved_attributes={"product_type": "plat"},
-            attribute_confidence={"product_type": 0.9}
+            attribute_confidence={"product_type": 0.9},
         ),
         conversation_turn=1,
         next_action="provide_info",
@@ -409,7 +484,7 @@ def sample_query_intent_product():
         detected_attributes={"product_type": "plat", "thickness": "10mm"},
         confidence=0.95,
         product_name="plat baja",
-        quantity=None
+        quantity=None,
     )
 
 
@@ -422,15 +497,19 @@ def sample_query_intent_price():
         query_level="variant",
         conversation_context=ConversationContext(
             resolved_attributes={"product_type": "hollow", "size": "40x40"},
-            attribute_confidence={"product_type": 0.85, "size": 0.9}
+            attribute_confidence={"product_type": 0.85, "size": 0.9},
         ),
         conversation_turn=2,
         next_action="provide_info",
         original_query="Berapa harga hollow 40x40?",
         current_query="Berapa harga hollow 40x40 galvanis?",
-        detected_attributes={"product_type": "hollow", "size": "40x40", "finish": "galvanis"},
+        detected_attributes={
+            "product_type": "hollow",
+            "size": "40x40",
+            "finish": "galvanis",
+        },
         confidence=0.88,
-        product_name="hollow galvanis"
+        product_name="hollow galvanis",
     )
 
 
@@ -448,13 +527,13 @@ def sample_query_intent_availability():
             attribute_type="dimensions",
             question_template="Ukuran berapa yang Anda cari?",
             options=["1200x2400", "1500x3000", "2000x4000"],
-            priority=1
+            priority=1,
         ),
         original_query="Ada stok plat?",
         current_query="Ada stok plat?",
         detected_attributes={"product_type": "plat"},
         confidence=0.7,
-        product_name="plat"
+        product_name="plat",
     )
 
 
@@ -472,5 +551,5 @@ def sample_query_intent_ambiguous():
         current_query="Saya butuh bahan konstruksi",
         detected_attributes={},
         confidence=0.4,
-        requires_human_intervention=False
+        requires_human_intervention=False,
     )
