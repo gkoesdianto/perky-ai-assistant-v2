@@ -553,3 +553,63 @@ def sample_query_intent_ambiguous():
         confidence=0.4,
         requires_human_intervention=False,
     )
+
+
+# Conversation Repository Fixtures
+@pytest.fixture
+def mock_conversation_repository():
+    """Create an in-memory conversation repository for testing."""
+    from src.infrastructure.repositories.in_memory_conversation_repository import (
+        InMemoryConversationRepository,
+    )
+
+    return InMemoryConversationRepository()
+
+
+# PydanticAI Agent Fixtures
+@pytest.fixture
+def mock_pydantic_ai_agent():
+    """Create a mock PydanticAI agent with run method.
+
+    This fixture is used to test the PydanticAI agent pattern
+    where the agent has a 'run' method instead of 'generate_response'.
+    """
+    agent = AsyncMock()
+    agent.run = AsyncMock(return_value="This is a PydanticAI response")
+    return agent
+
+
+# Sample Conversation Data Fixtures
+@pytest.fixture
+def sample_conversation_with_messages():
+    """Create a conversation with existing messages for testing.
+
+    This fixture provides a conversation that already has a history
+    of messages, useful for testing conversation context scenarios.
+    """
+    from src.domain.entities.conversation import Conversation
+    from src.domain.entities.message import Message
+
+    conversation = Conversation(
+        session_id="test-session-123", metadata={"test": "data"}
+    )
+
+    # Add some existing messages
+    conversation.add_message(
+        Message(
+            conversation_id=conversation.id,
+            sender_type="user",
+            content="Previous user message",
+            metadata={},
+        )
+    )
+    conversation.add_message(
+        Message(
+            conversation_id=conversation.id,
+            sender_type="ai_agent",
+            content="Previous AI response",
+            metadata={},
+        )
+    )
+
+    return conversation
