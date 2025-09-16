@@ -281,3 +281,8 @@ dev-debug.log
 # Task files
 # tasks.json
 # tasks/
+
+# ============================================
+# Task Master AI
+# ============================================
+.taskmaster/
