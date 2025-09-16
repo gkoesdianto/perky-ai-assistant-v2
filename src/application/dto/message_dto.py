@@ -13,7 +13,7 @@ class MessageDTO:
     metadata: Dict[str, Any] = field(default_factory=dict)
 
     @classmethod
-    def from_entity(cls, message, session_id: str = None) -> "MessageDTO":
+    def from_entity(cls, message, session_id: Optional[str] = None) -> "MessageDTO":
         """Convert Message entity to MessageDTO.
 
         Args:
