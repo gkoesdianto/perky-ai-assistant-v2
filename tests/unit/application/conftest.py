@@ -16,6 +16,7 @@ from src.application.use_cases.interfaces import (
     StartChatSessionUseCase,
 )
 from src.domain.value_objects import ProductInfo, ProductWithVariantsInfo, VariantInfo
+from src.domain.value_objects.query_intent import QueryIntent, ConversationContext, ClarificationNeeded
 
 # Import mock implementations
 from tests.unit.application.mocks import MockRedisAdapter, MockRedisClient
@@ -140,6 +141,30 @@ class MockProductServiceAdapter:
         self.last_product_id = None
 
 
+class MockQueryAnalyzerAdapter:
+    """Mock implementation of QueryAnalyzerPort for testing."""
+
+    def __init__(self):
+        self.analyze_mock = AsyncMock()
+        self.call_count = 0
+        self.last_query = None
+        self.last_context = None
+
+    async def analyze(
+        self, query: str, conversation_context: Optional[List[MessageDTO]] = None
+    ) -> QueryIntent:
+        self.call_count += 1
+        self.last_query = query
+        self.last_context = conversation_context
+        return await self.analyze_mock(query, conversation_context)
+
+    def reset(self):
+        self.analyze_mock.reset_mock()
+        self.call_count = 0
+        self.last_query = None
+        self.last_context = None
+
+
 # Use Case Fixtures
 @pytest.fixture
 def mock_start_chat_session():
@@ -170,6 +195,12 @@ def mock_ai_agent():
 def mock_product_service():
     """Fixture for product service port mock."""
     return MockProductServiceAdapter()
+
+
+@pytest.fixture
+def mock_query_analyzer():
+    """Fixture for query analyzer port mock."""
+    return MockQueryAnalyzerAdapter()
 
 
 # DTO Fixtures
@@ -357,3 +388,89 @@ def mock_redis_with_existing_session(mock_redis_adapter):
     asyncio.run(setup())
 
     return mock_redis_adapter, session_data
+
+
+# Query Intent Fixtures
+@pytest.fixture
+def sample_query_intent_product():
+    """Create a sample QueryIntent for product inquiry."""
+    return QueryIntent(
+        type="product_inquiry",
+        clarification_stage="complete",
+        query_level="product",
+        conversation_context=ConversationContext(
+            resolved_attributes={"product_type": "plat"},
+            attribute_confidence={"product_type": 0.9}
+        ),
+        conversation_turn=1,
+        next_action="provide_info",
+        original_query="Ada plat baja 10mm?",
+        current_query="Ada plat baja 10mm?",
+        detected_attributes={"product_type": "plat", "thickness": "10mm"},
+        confidence=0.95,
+        product_name="plat baja",
+        quantity=None
+    )
+
+
+@pytest.fixture
+def sample_query_intent_price():
+    """Create a sample QueryIntent for price check."""
+    return QueryIntent(
+        type="price_check",
+        clarification_stage="complete",
+        query_level="variant",
+        conversation_context=ConversationContext(
+            resolved_attributes={"product_type": "hollow", "size": "40x40"},
+            attribute_confidence={"product_type": 0.85, "size": 0.9}
+        ),
+        conversation_turn=2,
+        next_action="provide_info",
+        original_query="Berapa harga hollow 40x40?",
+        current_query="Berapa harga hollow 40x40 galvanis?",
+        detected_attributes={"product_type": "hollow", "size": "40x40", "finish": "galvanis"},
+        confidence=0.88,
+        product_name="hollow galvanis"
+    )
+
+
+@pytest.fixture
+def sample_query_intent_availability():
+    """Create a sample QueryIntent for availability check."""
+    return QueryIntent(
+        type="availability_check",
+        clarification_stage="narrowing",
+        query_level="product",
+        conversation_context=ConversationContext(),
+        conversation_turn=1,
+        next_action="request_clarification",
+        next_clarification=ClarificationNeeded(
+            attribute_type="dimensions",
+            question_template="Ukuran berapa yang Anda cari?",
+            options=["1200x2400", "1500x3000", "2000x4000"],
+            priority=1
+        ),
+        original_query="Ada stok plat?",
+        current_query="Ada stok plat?",
+        detected_attributes={"product_type": "plat"},
+        confidence=0.7,
+        product_name="plat"
+    )
+
+
+@pytest.fixture
+def sample_query_intent_ambiguous():
+    """Create a sample QueryIntent for ambiguous query."""
+    return QueryIntent(
+        type="general",
+        clarification_stage="initial",
+        query_level="ambiguous",
+        conversation_context=ConversationContext(),
+        conversation_turn=1,
+        next_action="request_clarification",
+        original_query="Saya butuh bahan konstruksi",
+        current_query="Saya butuh bahan konstruksi",
+        detected_attributes={},
+        confidence=0.4,
+        requires_human_intervention=False
+    )
