@@ -199,6 +199,22 @@ class ProductFactory(BaseFactory[ProductInfo]):
         defaults.update(kwargs)
         return cls.create(**defaults)
 
+    # Backward compatibility aliases
+    @classmethod
+    def create_steel_plate(cls, **kwargs) -> ProductInfo:
+        """Alias for backward compatibility."""
+        return cls.steel_plate(**kwargs)
+
+    @classmethod
+    def create_minimal(cls, **kwargs) -> ProductInfo:
+        """Alias for backward compatibility."""
+        return cls.minimal(**kwargs)
+
+    @classmethod
+    def create_complete(cls, **kwargs) -> ProductInfo:
+        """Alias for backward compatibility."""
+        return cls.complete(**kwargs)
+
 
 class VariantFactory(BaseFactory[VariantInfo]):
     """Factory for VariantInfo value objects."""
@@ -263,6 +279,17 @@ class VariantFactory(BaseFactory[VariantInfo]):
         defaults.update(kwargs)
         return cls.create(**defaults)
 
+    # Backward compatibility aliases
+    @classmethod
+    def create_steel_plate_10mm(cls, **kwargs) -> VariantInfo:
+        """Alias for backward compatibility."""
+        return cls.steel_plate_10mm(**kwargs)
+
+    @classmethod
+    def create_steel_plate_5mm(cls, **kwargs) -> VariantInfo:
+        """Alias for backward compatibility."""
+        return cls.steel_plate_5mm(**kwargs)
+
 
 class QueryIntentFactory(BaseFactory[QueryIntent]):
     """Factory for QueryIntent value objects."""
@@ -273,9 +300,11 @@ class QueryIntentFactory(BaseFactory[QueryIntent]):
     def _get_defaults(cls) -> Dict[str, Any]:
         """QueryIntent-specific defaults."""
         return {
-            "intent_type": "general",
-            "confidence": 0.9,
-            "entities": {},
+            "type": "general",
+            "original_query": "Test query",
+            "current_query": "Test query",
+            "confidence": 0.85,  # Updated to match test expectations
+            "detected_attributes": {},
         }
 
     # Presets
@@ -283,31 +312,56 @@ class QueryIntentFactory(BaseFactory[QueryIntent]):
     def product_inquiry(cls, **kwargs) -> QueryIntent:
         """Create a product inquiry intent."""
         defaults = {
-            "intent_type": "product_inquiry",
+            "type": "product_inquiry",
+            "original_query": "Berapa harga plat baja?",
+            "current_query": "Berapa harga plat baja?",
             "confidence": 0.95,
-            "entities": {"product": "plat baja"},
+            "detected_attributes": {"product": "plat baja"},
+            "product_name": "plat baja",
         }
         defaults.update(kwargs)
         return cls.create(**defaults)
+
+    @classmethod
+    def create_product_inquiry(cls, **kwargs) -> QueryIntent:
+        """Alias for backward compatibility."""
+        return cls.product_inquiry(**kwargs)
 
     @classmethod
     def price_check(cls, **kwargs) -> QueryIntent:
         """Create a price check intent."""
         defaults = {
-            "intent_type": "price_check",
-            "confidence": 0.92,
-            "entities": {"product": "plat baja", "specification": "5mm"},
+            "type": "price_check",
+            "original_query": "Berapa harga plat baja 5mm?",
+            "current_query": "Berapa harga plat baja 5mm?",
+            "confidence": 0.98,
+            "detected_attributes": {"product": "plat baja", "thickness": "5mm"},
+            "product_name": "plat baja 5mm",
         }
         defaults.update(kwargs)
         return cls.create(**defaults)
 
     @classmethod
+    def create_price_check(cls, **kwargs) -> QueryIntent:
+        """Alias for backward compatibility."""
+        return cls.price_check(**kwargs)
+
+    @classmethod
     def availability_check(cls, **kwargs) -> QueryIntent:
         """Create an availability check intent."""
         defaults = {
-            "intent_type": "availability_check",
-            "confidence": 0.88,
-            "entities": {"product": "plat baja"},
+            "type": "availability_check",
+            "original_query": "Apakah plat baja tersedia?",
+            "current_query": "Apakah plat baja tersedia?",
+            "confidence": 0.92,
+            "detected_attributes": {"product": "plat baja"},
+            "product_name": "plat baja SS400",
+            "quantity": 10,
         }
         defaults.update(kwargs)
         return cls.create(**defaults)
+
+    @classmethod
+    def create_availability_check(cls, **kwargs) -> QueryIntent:
+        """Alias for backward compatibility."""
+        return cls.availability_check(**kwargs)

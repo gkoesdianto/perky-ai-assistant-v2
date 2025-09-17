@@ -48,7 +48,7 @@ class DTOFactory(BaseFactory):
         """Create ConversationDTO."""
         now = datetime.now(timezone.utc)
         defaults = {
-            'conversation_id': f"conv-{uuid.uuid4().hex[:8]}",
+            'id': f"conv-{uuid.uuid4().hex[:8]}",
             'session_id': f"test-session-{uuid.uuid4().hex[:8]}",
             'started_at': now,
             'last_activity': now,
@@ -66,7 +66,7 @@ class DTOFactory(BaseFactory):
         for i in range(num_messages):
             message = cls.create_message_dto(
                 session_id=conversation.session_id,
-                conversation_id=conversation.conversation_id,
+                conversation_id=conversation.id,
                 sender_type="user" if i % 2 == 0 else "ai_agent",
                 content=f"Test message {i}",
             )

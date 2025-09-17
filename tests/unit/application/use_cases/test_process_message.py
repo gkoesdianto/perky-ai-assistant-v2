@@ -21,7 +21,7 @@ class TestProcessUserMessageUseCaseImpl:
     ):
         """Test processing a message when no conversation exists."""
         # Setup mock AI agent response
-        mock_ai_agent.generate_response_mock.return_value = "This is an AI response"
+        mock_ai_agent.generate_response.return_value = "This is an AI response"
 
         # Arrange
         use_case = ProcessUserMessageUseCaseImpl(
@@ -65,7 +65,7 @@ class TestProcessUserMessageUseCaseImpl:
     ):
         """Test processing a message with existing conversation history."""
         # Setup
-        mock_ai_agent.generate_response_mock.return_value = "This is an AI response"
+        mock_ai_agent.generate_response.return_value = "This is an AI response"
         await mock_conversation_repository.save(sample_conversation_with_messages)
 
         # Arrange
@@ -157,7 +157,7 @@ class TestProcessUserMessageUseCaseImpl:
     ):
         """Test that conversation context is limited to last 4 messages."""
         # Setup mock
-        mock_ai_agent.generate_response_mock.return_value = "AI response"
+        mock_ai_agent.generate_response.return_value = "AI response"
 
         # Arrange - Create conversation with 6 messages
         conversation = Conversation(session_id="test-session-123")
@@ -197,7 +197,7 @@ class TestProcessUserMessageUseCaseImpl:
     ):
         """Test that metadata is properly preserved in messages."""
         # Setup
-        mock_ai_agent.generate_response_mock.return_value = "AI response"
+        mock_ai_agent.generate_response.return_value = "AI response"
 
         # Arrange
         use_case = ProcessUserMessageUseCaseImpl(
@@ -243,7 +243,7 @@ class TestProcessUserMessageUseCaseImpl:
     ):
         """Test that session_id is correctly passed to MessageDTO."""
         # Setup
-        mock_ai_agent.generate_response_mock.return_value = "AI response"
+        mock_ai_agent.generate_response.return_value = "AI response"
 
         # Arrange
         use_case = ProcessUserMessageUseCaseImpl(
@@ -269,7 +269,7 @@ class TestProcessUserMessageUseCaseImpl:
     ):
         """Test that conversation is saved after processing."""
         # Setup
-        mock_ai_agent.generate_response_mock.return_value = "AI response"
+        mock_ai_agent.generate_response.return_value = "AI response"
 
         # Arrange
         use_case = ProcessUserMessageUseCaseImpl(
@@ -302,7 +302,7 @@ class TestProcessUserMessageUseCaseImpl:
     ):
         """Test that AIAgentPort pattern correctly converts context to MessageDTOs."""
         # Setup
-        mock_ai_agent.generate_response_mock.return_value = "Test response"
+        mock_ai_agent.generate_response.return_value = "Test response"
 
         # Create repository and save existing conversation
         repository = InMemoryConversationRepository()
@@ -341,7 +341,7 @@ class TestProcessUserMessageUseCaseImpl:
     ):
         """Test that when no metadata is provided, empty dict is used."""
         # Setup
-        mock_ai_agent.generate_response_mock.return_value = "AI response"
+        mock_ai_agent.generate_response.return_value = "AI response"
 
         # Arrange
         use_case = ProcessUserMessageUseCaseImpl(
