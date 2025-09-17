@@ -1,0 +1,133 @@
+============================= test session starts ==============================
+platform darwin -- Python 3.12.8, pytest-8.3.4, pluggy-1.6.0
+rootdir: /Users/GKoesdianto/Documents/my_codes/perky-ai-assistant-v2
+configfile: pyproject.toml
+testpaths: tests
+plugins: asyncio-0.24.0, cov-6.0.0, anyio-4.10.0, logfire-4.4.0
+asyncio: mode=Mode.STRICT, default_loop_scope=None
+collected 338 items
+
+tests/integration/domain/test_session_conversation_integration.py ...... [  1%]
+..                                                                       [  2%]
+tests/unit/application/dto/test_conversation_dto.py ....                 [  3%]
+tests/unit/application/dto/test_message_dto.py ......                    [  5%]
+tests/unit/application/dto/test_product_query_dto.py ...............     [  9%]
+tests/unit/application/dto/test_session_dto.py .....                     [ 11%]
+tests/unit/application/ports/test_ai_agent_port.py FFFF.FF               [ 13%]
+tests/unit/application/ports/test_product_service_port.py .FFF...F       [ 15%]
+tests/unit/application/ports/test_query_analyzer_port.py ............... [ 20%]
+.                                                                        [ 20%]
+tests/unit/application/services/test_chat_orchestrator.py ............   [ 23%]
+tests/unit/application/services/test_query_analyzer.py ............      [ 27%]
+tests/unit/application/test_container.py ..............                  [ 31%]
+tests/unit/application/use_cases/test_get_conversation.py ........       [ 34%]
+tests/unit/application/use_cases/test_interfaces.py .............E.E..   [ 39%]
+tests/unit/application/use_cases/test_process_message.py EEEEEEEEFE      [ 42%]
+tests/unit/application/use_cases/test_start_chat_session.py EEEEEEEE     [ 44%]
+tests/unit/domain/entities/test_base.py ..........                       [ 47%]
+tests/unit/domain/entities/test_conversation.py ........................ [ 54%]
+..                                                                       [ 55%]
+tests/unit/domain/entities/test_message.py ..................            [ 60%]
+tests/unit/domain/entities/test_session.py .........................     [ 68%]
+tests/unit/domain/repositories/test_product_repository.py ..........     [ 71%]
+tests/unit/domain/value_objects/test_product_info.py ...............     [ 75%]
+tests/unit/domain/value_objects/test_product_with_variants_info.py ..... [ 76%]
+...........                                                              [ 80%]
+tests/unit/domain/value_objects/test_query_intent.py ................... [ 85%]
+...............                                                          [ 90%]
+tests/unit/domain/value_objects/test_variant_info.py ................... [ 95%]
+..............                                                           [100%]
+
+---------- coverage: platform darwin, python 3.12.8-final-0 ----------
+Name                                                                   Stmts   Miss  Cover   Missing
+----------------------------------------------------------------------------------------------------
+src/application/container.py                                              19      0   100%
+src/application/dto/conversation_dto.py                                   12      0   100%
+src/application/dto/message_dto.py                                        14      0   100%
+src/application/dto/product_query_dto.py                                  14      0   100%
+src/application/dto/session_dto.py                                        11      0   100%
+src/application/ports/ai_agent_port.py                                     4      0   100%
+src/application/ports/conversation_repository_port.py                      9      3    67%   18, 26, 34
+src/application/ports/product_service_port.py                              5      0   100%
+src/application/ports/query_analyzer_port.py                               6      1    83%   22
+src/application/services/chat_orchestrator.py                             44      0   100%
+src/application/services/query_analyzer.py                                41      0   100%
+src/application/use_cases/get_conversation.py                             24      0   100%
+src/application/use_cases/interfaces.py                                   17      3    82%   13, 22, 29
+src/application/use_cases/process_message.py                              32      6    81%   45, 77-90, 108-115
+src/application/use_cases/start_chat_session.py                           20     11    45%   14-15, 21-58
+src/core/config.py                                                        44     44     0%   1-74
+src/core/events.py                                                        10     10     0%   1-14
+src/domain/entities/base.py                                               10      0   100%
+src/domain/entities/conversation.py                                       15      0   100%
+src/domain/entities/message.py                                            12      0   100%
+src/domain/entities/session.py                                            15      0   100%
+src/domain/repositories/base.py                                           19      5    74%   10, 14, 18, 22, 26
+src/domain/repositories/product_repository.py                             17      4    76%   24, 29, 34, 39
+src/domain/value_objects/product_info.py                                   9      0   100%
+src/domain/value_objects/product_with_variants_info.py                    43      0   100%
+src/domain/value_objects/query_intent.py                                  33      0   100%
+src/domain/value_objects/variant_info.py                                  59      4    93%   73, 81, 115-116
+src/infrastructure/cache/redis_client.py                                  16     16     0%   1-25
+src/infrastructure/database/session.py                                    11     11     0%   1-32
+src/infrastructure/repositories/in_memory_conversation_repository.py      12      2    83%   37-38
+src/main.py                                                               11     11     0%   1-30
+src/presentation/api/health.py                                             8      8     0%   1-14
+----------------------------------------------------------------------------------------------------
+TOTAL                                                                    616    139    77%
+Coverage HTML written to dir htmlcov
+
+
+============================= slowest 20 durations =============================
+0.06s call     tests/unit/domain/entities/test_conversation.py::TestMessageManagement::test_last_activity_update
+0.06s call     tests/unit/domain/entities/test_session.py::TestSessionActivity::test_multiple_activity_updates
+0.05s call     tests/unit/domain/entities/test_conversation.py::TestMessageManagement::test_add_multiple_messages
+0.03s setup    tests/unit/application/services/test_query_analyzer.py::TestQueryAnalyzerService::test_analyze_with_no_context
+0.02s setup    tests/unit/application/services/test_chat_orchestrator.py::TestChatOrchestrator::test_get_conversation_history_success
+0.02s setup    tests/unit/application/services/test_chat_orchestrator.py::TestChatOrchestrator::test_handle_user_message_with_different_error_types
+0.02s setup    tests/unit/application/services/test_chat_orchestrator.py::TestChatOrchestrator::test_handle_new_connection_failure
+0.02s setup    tests/unit/application/services/test_chat_orchestrator.py::TestChatOrchestrator::test_handle_user_message_success
+0.02s setup    tests/unit/application/services/test_chat_orchestrator.py::TestChatOrchestrator::test_handle_user_message_with_long_content
+0.02s setup    tests/unit/application/services/test_chat_orchestrator.py::TestChatOrchestrator::test_handle_new_connection_success
+0.02s setup    tests/unit/application/services/test_chat_orchestrator.py::TestChatOrchestrator::test_get_conversation_history_failure_returns_none
+0.02s setup    tests/unit/application/services/test_chat_orchestrator.py::TestChatOrchestrator::test_get_conversation_history_not_found
+0.02s setup    tests/unit/application/services/test_chat_orchestrator.py::TestChatOrchestrator::test_orchestrator_initialization
+0.02s setup    tests/unit/application/services/test_chat_orchestrator.py::TestChatOrchestrator::test_handle_session_end
+0.02s setup    tests/unit/application/services/test_chat_orchestrator.py::TestChatOrchestrator::test_handle_user_message_without_metadata
+0.02s setup    tests/unit/application/services/test_chat_orchestrator.py::TestChatOrchestrator::test_handle_user_message_failure_returns_error_message
+0.01s call     tests/unit/domain/entities/test_conversation.py::TestConversationConcurrency::test_concurrent_context_retrieval
+0.01s call     tests/unit/domain/entities/test_session.py::TestSessionConcurrency::test_concurrent_activity_updates
+0.01s call     tests/unit/domain/entities/test_session.py::TestSessionActivity::test_update_activity
+0.01s call     tests/unit/domain/entities/test_conversation.py::TestConversationLifecycle::test_conversation_timestamps
+=========================== short test summary info ============================
+ERROR tests/unit/application/use_cases/test_interfaces.py::TestGetConversationUseCase::test_execute_returns_conversation
+ERROR tests/unit/application/use_cases/test_interfaces.py::TestGetConversationUseCase::test_call_tracking
+ERROR tests/unit/application/use_cases/test_process_message.py::TestProcessUserMessageUseCaseImpl::test_process_message_with_new_conversation
+ERROR tests/unit/application/use_cases/test_process_message.py::TestProcessUserMessageUseCaseImpl::test_process_message_with_existing_conversation
+ERROR tests/unit/application/use_cases/test_process_message.py::TestProcessUserMessageUseCaseImpl::test_process_message_with_pydantic_agent
+ERROR tests/unit/application/use_cases/test_process_message.py::TestProcessUserMessageUseCaseImpl::test_process_message_with_error_returns_indonesian_message
+ERROR tests/unit/application/use_cases/test_process_message.py::TestProcessUserMessageUseCaseImpl::test_conversation_context_limits_to_4_messages
+ERROR tests/unit/application/use_cases/test_process_message.py::TestProcessUserMessageUseCaseImpl::test_metadata_is_preserved_in_messages
+ERROR tests/unit/application/use_cases/test_process_message.py::TestProcessUserMessageUseCaseImpl::test_session_id_passed_correctly_to_dto
+ERROR tests/unit/application/use_cases/test_process_message.py::TestProcessUserMessageUseCaseImpl::test_conversation_repository_save_called_after_processing
+ERROR tests/unit/application/use_cases/test_process_message.py::TestProcessUserMessageUseCaseImpl::test_no_metadata_provided_uses_empty_dict
+ERROR tests/unit/application/use_cases/test_start_chat_session.py::TestStartChatSessionUseCaseImpl::test_execute_with_existing_session
+ERROR tests/unit/application/use_cases/test_start_chat_session.py::TestStartChatSessionUseCaseImpl::test_execute_with_new_session
+ERROR tests/unit/application/use_cases/test_start_chat_session.py::TestStartChatSessionUseCaseImpl::test_execute_with_empty_metadata
+ERROR tests/unit/application/use_cases/test_start_chat_session.py::TestStartChatSessionUseCaseImpl::test_execute_preserves_timestamps
+ERROR tests/unit/application/use_cases/test_start_chat_session.py::TestStartChatSessionUseCaseImpl::test_redis_key_format
+ERROR tests/unit/application/use_cases/test_start_chat_session.py::TestStartChatSessionUseCaseImpl::test_ttl_is_set_correctly
+ERROR tests/unit/application/use_cases/test_start_chat_session.py::TestStartChatSessionUseCaseImpl::test_session_retrieval_idempotency
+ERROR tests/unit/application/use_cases/test_start_chat_session.py::TestStartChatSessionUseCaseImpl::test_concurrent_session_creation
+FAILED tests/unit/application/ports/test_ai_agent_port.py::TestMockAIAgentAdapter::test_generate_response_without_context
+FAILED tests/unit/application/ports/test_ai_agent_port.py::TestMockAIAgentAdapter::test_generate_response_with_context
+FAILED tests/unit/application/ports/test_ai_agent_port.py::TestMockAIAgentAdapter::test_generate_response_for_product_inquiry
+FAILED tests/unit/application/ports/test_ai_agent_port.py::TestMockAIAgentAdapter::test_generate_response_empty_message
+FAILED tests/unit/application/ports/test_ai_agent_port.py::TestMockAIAgentAdapter::test_multiple_calls_tracking
+FAILED tests/unit/application/ports/test_ai_agent_port.py::TestMockAIAgentAdapter::test_protocol_compliance
+FAILED tests/unit/application/ports/test_product_service_port.py::TestMockProductServiceAdapter::test_search_products_with_results
+FAILED tests/unit/application/ports/test_product_service_port.py::TestMockProductServiceAdapter::test_search_products_indonesian_query
+FAILED tests/unit/application/ports/test_product_service_port.py::TestMockProductServiceAdapter::test_get_product_with_variants_found
+FAILED tests/unit/application/ports/test_product_service_port.py::TestMockProductServiceAdapter::test_protocol_compliance
+FAILED tests/unit/application/use_cases/test_process_message.py::TestProcessUserMessageUseCaseImpl::test_ai_agent_port_pattern_with_message_dto_context
+================== 11 failed, 308 passed, 19 errors in 3.41s ===================

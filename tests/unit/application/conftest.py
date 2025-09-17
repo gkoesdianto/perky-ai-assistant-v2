@@ -7,54 +7,6 @@ Kept for backward compatibility and layer-specific configuration.
 # Application-specific test configuration
 import pytest
 
-# Import application-specific fixtures that are not in root conftest
-# These are layer-specific fixtures that don't belong in the root
-
-# Query analysis fixtures
-from tests.unit.application.fixtures.query_fixtures import (  # noqa: F401
-    query_analyzer_service,
-    sample_query_intent_with_clarification,
-    sample_query_intent_product,
-    sample_query_intent_price,
-    sample_query_intent_availability,
-    sample_query_intent_ambiguous,
-)
-
-# DTO fixtures for application layer
-from tests.unit.application.fixtures.dto_fixtures import (  # noqa: F401
-    sample_conversation_context,
-    sample_query_analyzer_messages,
-)
-
-# Conversation fixtures for application layer
-from tests.unit.application.fixtures.conversation_fixtures import (  # noqa: F401
-    sample_conversation_with_messages,
-    sample_conversation_detailed,
-    sample_conversation_empty,
-    sample_conversation_many_messages,
-    mock_conversation_repository_async,
-)
-
-# Use case mocks
-from tests.unit.application.fixtures.mock_use_cases import (  # noqa: F401
-    mock_start_chat_session,
-    mock_process_message,
-    mock_get_conversation,
-)
-
-# Port mocks not in root conftest
-from tests.unit.application.fixtures.mock_ports import (  # noqa: F401
-    mock_pydantic_ai_agent,
-    mock_query_analyzer,
-)
-
-# Redis-specific fixtures for application layer
-from tests.unit.application.fixtures.redis_fixtures import (  # noqa: F401
-    mock_redis_client,
-    mock_redis_adapter,
-    mock_redis_with_existing_session,
-)
-
 # ============================================================================
 # The following fixtures are available from root conftest.py automatically:
 # ============================================================================
