@@ -7,6 +7,7 @@ from .domain import (
     MessageFactory,
     ProductFactory,
     VariantFactory,
+    QueryIntentFactory,
 )
 from .mocks import (
     MockAIAgentFactory,
@@ -15,7 +16,8 @@ from .mocks import (
 )
 from .test_data import (
     DTOFactory,
-    QueryIntentFactory,
+    ProductWithVariantsFactory,
+    TestDataPresets,
 )
 
 __all__ = [
@@ -25,9 +27,11 @@ __all__ = [
     'MessageFactory',
     'ProductFactory',
     'VariantFactory',
+    'QueryIntentFactory',
     'MockAIAgentFactory',
     'MockProductServiceFactory',
     'MockRedisFactory',
     'DTOFactory',
-    'QueryIntentFactory',
+    'ProductWithVariantsFactory',
+    'TestDataPresets',
 ]
