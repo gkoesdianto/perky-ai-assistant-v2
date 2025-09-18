@@ -1,0 +1,60 @@
+tests
+├── e2e
+├── integration
+│   ├── __init__.py
+│   └── domain
+│       ├── __init__.py
+│       └── test_session_conversation_integration.py
+└── unit
+    ├── application
+    │   ├── conftest.py
+    │   ├── dto
+    │   │   ├── test_conversation_dto.py
+    │   │   ├── test_message_dto.py
+    │   │   ├── test_product_query_dto.py
+    │   │   └── test_session_dto.py
+    │   ├── fixtures
+    │   │   ├── __init__.py
+    │   │   ├── conversation_fixtures.py
+    │   │   ├── dto_fixtures.py
+    │   │   ├── mock_ports.py
+    │   │   ├── mock_redis.py
+    │   │   ├── mock_use_cases.py
+    │   │   ├── product_fixtures.py
+    │   │   ├── query_fixtures.py
+    │   │   └── redis_fixtures.py
+    │   ├── ports
+    │   │   ├── test_ai_agent_port.py
+    │   │   ├── test_product_service_port.py
+    │   │   └── test_query_analyzer_port.py
+    │   ├── services
+    │   │   ├── __init__.py
+    │   │   ├── test_chat_orchestrator.py
+    │   │   └── test_query_analyzer.py
+    │   ├── test_container.py
+    │   └── use_cases
+    │       ├── test_get_conversation.py
+    │       ├── test_interfaces.py
+    │       ├── test_process_message.py
+    │       └── test_start_chat_session.py
+    └── domain
+        ├── __init__.py
+        ├── conftest.py
+        ├── entities
+        │   ├── __init__.py
+        │   ├── test_base.py
+        │   ├── test_conversation.py
+        │   ├── test_message.py
+        │   └── test_session.py
+        ├── factories.py
+        ├── repositories
+        │   ├── __init__.py
+        │   └── test_product_repository.py
+        └── value_objects
+            ├── __init__.py
+            ├── test_product_info.py
+            ├── test_product_with_variants_info.py
+            ├── test_query_intent.py
+            └── test_variant_info.py
+
+15 directories, 43 files

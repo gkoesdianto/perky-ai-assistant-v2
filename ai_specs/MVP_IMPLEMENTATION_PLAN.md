@@ -2,16 +2,19 @@
 
 ## Executive Summary
 
-This document outlines a detailed implementation plan for the Steel Chat MVP,
+This document outlines a streamlined implementation plan for the Steel Chat **Internal MVP**,
 focusing on building a **working end-to-end chat system in 5 days** using
-a "walking skeleton" approach. The strategy prioritizes the Application Layer first
-with mock infrastructure, enabling early validation and parallel development.
+a "walking skeleton" approach. This internal MVP prioritizes rapid validation
+with simplified architecture and mock infrastructure.
 
-**Key Approach**: Application Layer → Mock Infrastructure → WebSocket → Real Implementation
+**Key Approach**: Single Agent with Tools → Mock Infrastructure → WebSocket → Iterate
 
-**Timeline**: 5 days to working MVP (can demo to stakeholders)
+**Timeline**: 5 days to working internal MVP (demo-ready for internal stakeholders)
 
-**Core Principle**: Build thin vertical slice through all layers that actually works, then iterate.
+**Core Principle**: Build thin vertical slice through all layers that actually works for internal testing,
+then iterate based on feedback.
+
+**Scope**: Internal MVP - not production-ready, focused on validating core chat flow with 3 key scenarios.
 
 ---
 
@@ -20,14 +23,15 @@ with mock infrastructure, enabling early validation and parallel development.
 1. [Architecture Overview](#architecture-overview)
 2. [Development Strategy](#development-strategy)
 3. [Phase 1: Application Layer Foundation (Day 1)](#phase-1-application-layer-foundation-day-1)
-4. [Phase 2: Core Use Cases (Day 2)](#phase-2-core-use-cases-day-2)
-5. [Phase 3: Mock Infrastructure (Day 2-3)](#phase-3-mock-infrastructure-day-2-3)
-6. [Phase 4: WebSocket Integration (Day 3-4)](#phase-4-websocket-integration-day-3-4)
-7. [Phase 5: AI Agent Integration (Day 4-5)](#phase-5-ai-agent-integration-day-4-5)
+4. [Phase 2: Single Agent Implementation (Day 1-2)](#phase-2-single-agent-implementation-day-1-2)
+5. [Phase 3: Mock Infrastructure (Day 2)](#phase-3-mock-infrastructure-day-2)
+6. [Phase 4: WebSocket Integration (Day 3)](#phase-4-websocket-integration-day-3)
+7. [Phase 5: Integration & Testing (Day 4-5)](#phase-5-integration--testing-day-4-5)
 8. [Testing Strategy](#testing-strategy)
 9. [Deployment & Validation](#deployment--validation)
 10. [Risk Mitigation](#risk-mitigation)
 11. [Success Criteria](#success-criteria)
+12. [Summary](#summary)
 
 ---
 
@@ -35,34 +39,46 @@ with mock infrastructure, enabling early validation and parallel development.
 
 ### MVP Scope
 
-The MVP implements a minimal but complete chat flow:
+The Internal MVP implements a minimal but complete chat flow with single-agent architecture:
 
 ```text
-User → WebSocket → Application Layer → AI Agent → PIM (Mock) → Response
+User → WebSocket → Application Layer → Single LLM Agent with Tools → PIM (Mock) → Response
+                           ↓
+                   Chat Assistant Agent
+                    (with tool calling)
 ```
+
+### Single-Agent Architecture
+
+The system employs a single PydanticAI agent with tool calling for simplicity:
+
+**Chat Assistant Agent** (GPT-4o-mini):
+- Uses tools to analyze intent and search products
+- Generates natural language responses
+- Maintains conversation context
+- Simpler to implement and debug than dual-agent system
 
 ### Layer Responsibilities
 
 ```yaml
 Presentation Layer:
   - WebSocket endpoint for real-time communication
-  - Request/response validation
-  - Session management
+  - Basic request/response handling
+  - Simple session management
 
 Application Layer:
-  - Use cases for business logic orchestration
-  - DTOs for data transfer
-  - Service coordination
-  - AI agent wrapper
+  - Single use case for chat orchestration
+  - Basic DTOs for data transfer
+  - Simple service interface for AI agent
 
-Infrastructure Layer (Mocked Initially):
-  - Mock PIM client returning hardcoded products
+Infrastructure Layer:
+  - Single PydanticAI agent with tool calling
+  - Mock PIM data (hardcoded products)
   - In-memory conversation storage
-  - Mock AI responses for testing
 
 Domain Layer (Already Implemented):
   - Entities: Session, Conversation, Message
-  - Value Objects: ProductInfo, VariantInfo, QueryIntent
+  - Value Objects: ProductInfo, VariantInfo
   - Repository interfaces
 ```
 
@@ -79,6 +95,25 @@ Build the thinnest possible slice that works end-to-end:
 3. **Iterate Quickly**: Get feedback early and often
 4. **Parallel Development**: Teams can work on infrastructure while app layer uses mocks
 
+### Internal MVP Focus Areas
+
+The simplified single-agent architecture focuses on:
+
+1. **Core Functionality Validation**:
+   - Basic product search and recommendation
+   - Simple conversation flow
+   - Mock data for rapid iteration
+
+2. **Three Key Scenarios**:
+   - Product search by specifications
+   - Price inquiry and availability
+   - Basic product recommendations
+
+3. **Rapid Iteration**:
+   - Quick feedback loops with internal testing
+   - No production constraints
+   - Focus on core business logic validation
+
 ### Dependency Order
 
 ```text
@@ -89,6 +124,65 @@ graph TD
     D --> E[WebSocket Endpoint]
     E --> F[Integration Testing]
     F --> G[Real Implementations]
+```
+
+### Project Dependencies
+
+The project already has all required dependencies configured:
+
+```python
+# requirements/base.txt (Existing)
+fastapi==0.115.5
+uvicorn[standard]==0.32.1
+pydantic==2.10.3
+pydantic-settings==2.6.1
+
+# LLM Integration (Already included)
+pydantic-ai==1.0.1  # For structured LLM agent implementation
+openai==1.57.0      # OpenAI client for GPT-4o-mini
+
+# Infrastructure (Already included)
+redis==5.2.0        # Session and cache management
+httpx==0.27.2       # Async HTTP client for PIM integration
+sqlalchemy==2.0.36  # Database persistence
+asyncpg==0.30.0     # Async PostgreSQL adapter
+alembic==1.14.0     # Database migrations
+
+# Authentication & Security
+python-jose[cryptography]==3.3.0
+python-multipart==0.0.7
+
+# requirements/dev.txt (Development & Testing)
+pytest==8.3.4
+pytest-asyncio==0.24.0
+pytest-cov==6.0.0
+black==24.10.0
+isort==5.13.2
+flake8==7.1.1
+mypy==1.13.0
+pre-commit==4.0.1
+```
+
+**Note**: All required dependencies are already present in the project.
+
+### Environment Configuration
+
+Minimal environment variables for internal MVP:
+
+```bash
+# .env file
+# OpenAI Configuration
+OPENAI_API_KEY=sk-...  # Required for LLM agent
+OPENAI_MODEL=gpt-4o-mini
+OPENAI_MAX_TOKENS=500
+OPENAI_TEMPERATURE=0.7
+
+# Feature Flags
+USE_MOCK_MODE=true  # Use mock PIM data for internal MVP
+
+# Redis Configuration (optional for internal MVP)
+REDIS_URL=redis://localhost:6379/0
+SESSION_TTL_SECONDS=3600
 ```
 
 ---
@@ -306,14 +400,13 @@ container = DIContainer()
 
 ---
 
-## Phase 2: Core Use Cases (Day 2)
+## Phase 2: Single Agent Implementation (Day 1-2)
 
 ### Objectives
 
-- Implement concrete use cases
-- Create chat orchestrator service
-- Setup AI agent wrapper
-- Implement query analyzer
+- Implement single PydanticAI agent with tools
+- Create mock product search tool
+- Setup basic conversation flow
 
 ### 2.1 Start Chat Session Use Case
 
@@ -370,28 +463,27 @@ class StartChatSessionUseCaseImpl(StartChatSessionUseCase):
 ### 2.2 Process User Message Use Case
 
 ```python
-# src/application/use_cases/process_user_message.py
+# src/application/use_cases/process_message.py
 from typing import Optional, Dict, Any
 from datetime import datetime, timezone
 from src.domain.entities import Message, Conversation
 from src.domain.value_objects import QueryIntent
 from src.application.dto import MessageDTO
+from src.application.ports import QueryAnalyzerPort, AIAgentPort
 from src.application.use_cases.interfaces import ProcessUserMessageUseCase
 
 class ProcessUserMessageUseCaseImpl(ProcessUserMessageUseCase):
-    """Implementation of process user message use case"""
+    """Implementation of process user message use case with single agent"""
 
     def __init__(
         self,
-        ai_agent,
+        chat_agent,
         product_service,
-        conversation_repository,
-        query_analyzer
+        conversation_repository
     ):
-        self.ai_agent = ai_agent
+        self.chat_agent = chat_agent
         self.product_service = product_service
         self.conversation_repository = conversation_repository
-        self.query_analyzer = query_analyzer
 
     async def execute(
         self,
@@ -399,60 +491,88 @@ class ProcessUserMessageUseCaseImpl(ProcessUserMessageUseCase):
         content: str,
         metadata: Optional[Dict[str, Any]] = None
     ) -> MessageDTO:
-        """Process user message and generate AI response"""
+        """Process user message with single agent"""
 
-        # 1. Create user message
-        user_message = Message(
-            content=content,
-            sender_type="user",
-            session_id=session_id,
-            metadata=metadata or {}
-        )
-
-        # 2. Analyze query intent
-        intent = await self.query_analyzer.analyze(content)
-        user_message.metadata["intent"] = intent.to_dict()
-
-        # 3. Get conversation context
+        # 1. Get or create conversation
         conversation = await self.conversation_repository.get_by_session(session_id)
         if not conversation:
             conversation = Conversation(session_id=session_id)
 
-        # 4. Add user message to conversation
+        # 2. Prepare conversation context
+        context = {
+            "conversation_history": [
+                {"sender": msg.sender_type, "content": msg.content}
+                for msg in conversation.messages[-4:]  # Last 2 exchanges
+            ]
+        }
+
+        # 3. Create user message
+        user_message = Message(
+            content=content,
+            sender_type="user",
+            session_id=session_id
+        )
         conversation.add_message(user_message)
 
-        # 5. Generate AI response
-        context_messages = [
-            MessageDTO.from_entity(msg)
-            for msg in conversation.messages[-5:]  # Last 5 messages for context
-        ]
-
-        response_content = await self.ai_agent.generate_response(
+        # 4. Generate AI response using single agent with tools
+        response_content = await self.chat_agent.run(
             message=content,
-            conversation_context=context_messages
+            conversation_context=context
         )
 
-        # 6. Create AI message
+        # 5. Create AI response message
         ai_message = Message(
             content=response_content,
             sender_type="ai_agent",
-            session_id=session_id,
-            metadata={
-                "responding_to": user_message.id,
-                "intent": intent.to_dict()
-            }
+            session_id=session_id
         )
-
-        # 7. Add AI message to conversation
         conversation.add_message(ai_message)
 
-        # 8. Save conversation
+        # 6. Save conversation
         await self.conversation_repository.save(conversation)
 
         return MessageDTO.from_entity(ai_message)
 ```
 
-### 2.3 Chat Orchestrator Service
+### 2.3 Get Conversation Use Case
+
+```python
+# src/application/use_cases/get_conversation.py
+from typing import Optional, List
+from src.application.dto import ConversationDTO, MessageDTO
+from src.application.use_cases.interfaces import GetConversationUseCase
+
+class GetConversationUseCaseImpl(GetConversationUseCase):
+    """Implementation of get conversation use case"""
+
+    def __init__(self, conversation_repository):
+        self.conversation_repository = conversation_repository
+
+    async def execute(self, session_id: str) -> Optional[ConversationDTO]:
+        """Get conversation history for a session"""
+
+        # 1. Retrieve conversation from repository
+        conversation = await self.conversation_repository.get_by_session(session_id)
+
+        if not conversation:
+            return None
+
+        # 2. Convert to DTO
+        messages = [
+            MessageDTO.from_entity(msg)
+            for msg in conversation.messages
+        ]
+
+        return ConversationDTO(
+            session_id=conversation.session_id,
+            messages=messages,
+            metadata=conversation.metadata,
+            created_at=conversation.created_at,
+            updated_at=conversation.updated_at
+        )
+```
+
+### 2.4 Chat Orchestrator Service
 
 ```python
 # src/application/services/chat_orchestrator.py
@@ -527,97 +647,46 @@ class ChatOrchestrator:
             return None
 ```
 
-### 2.4 Query Analyzer Service
+### 2.5 Query Analyzer Port and Service
+
+```python
+# src/application/ports/query_analyzer_port.py
+from typing import Protocol, Optional, List
+from src.domain.value_objects import QueryIntent
+from src.application.dto import MessageDTO
+
+class QueryAnalyzerPort(Protocol):
+    """Port for query intent analysis"""
+
+    async def analyze(
+        self,
+        query: str,
+        conversation_context: Optional[List[MessageDTO]] = None
+    ) -> QueryIntent:
+        """Analyze query to determine intent"""
+        ...
+```
 
 ```python
 # src/application/services/query_analyzer.py
-import re
-from typing import List, Optional
+from typing import Optional, List
+from src.application.ports.query_analyzer_port import QueryAnalyzerPort
 from src.domain.value_objects import QueryIntent
+from src.application.dto import MessageDTO
 
 class QueryAnalyzer:
-    """Analyzes user queries to determine intent"""
+    """Application service for query analysis"""
 
-    # Indonesian product keywords
-    PRODUCT_KEYWORDS = [
-        "plat", "baja", "besi", "hollow", "pipa", "siku",
-        "beam", "wiremesh", "beton", "galvanis", "hitam"
-    ]
+    def __init__(self, analyzer_port: QueryAnalyzerPort):
+        self.analyzer_port = analyzer_port
 
-    PRICE_KEYWORDS = ["harga", "berapa", "price", "cost"]
-    STOCK_KEYWORDS = ["stok", "stock", "tersedia", "ada"]
-    SIZE_KEYWORDS = ["ukuran", "size", "dimensi", "tebal", "lebar", "panjang"]
-
-    async def analyze(self, query: str) -> QueryIntent:
-        """Analyze query to determine intent"""
-        query_lower = query.lower()
-
-        # Detect intent type
-        intent_type = self._detect_intent_type(query_lower)
-
-        # Extract product mentions
-        products = self._extract_products(query_lower)
-
-        # Extract quantities
-        quantity = self._extract_quantity(query_lower)
-
-        # Detect clarification needs
-        needs_clarification = self._needs_clarification(query_lower, products)
-
-        return QueryIntent(
-            type=intent_type,
-            products=products,
-            quantity=quantity,
-            needs_clarification=needs_clarification,
-            original_query=query
-        )
-
-    def _detect_intent_type(self, query: str) -> str:
-        """Detect the primary intent of the query"""
-        if any(word in query for word in self.PRICE_KEYWORDS):
-            return "price_inquiry"
-        elif any(word in query for word in self.STOCK_KEYWORDS):
-            return "stock_check"
-        elif any(word in query for word in self.SIZE_KEYWORDS):
-            return "specification_inquiry"
-        elif any(word in query for word in self.PRODUCT_KEYWORDS):
-            return "product_inquiry"
-        else:
-            return "general_inquiry"
-
-    def _extract_products(self, query: str) -> List[str]:
-        """Extract product mentions from query"""
-        products = []
-        for keyword in self.PRODUCT_KEYWORDS:
-            if keyword in query:
-                products.append(keyword)
-        return products
-
-    def _extract_quantity(self, query: str) -> Optional[int]:
-        """Extract quantity from query"""
-        # Look for patterns like "10 lembar", "5 batang", etc.
-        patterns = [
-            r'(\d+)\s*(?:lembar|batang|pcs|unit|kg|ton)',
-            r'(\d+)\s+(?:plat|baja|pipa|hollow)'
-        ]
-
-        for pattern in patterns:
-            match = re.search(pattern, query)
-            if match:
-                return int(match.group(1))
-        return None
-
-    def _needs_clarification(self, query: str, products: List[str]) -> List[str]:
-        """Determine what clarifications are needed"""
-        clarifications = []
-
-        if products and not any(word in query for word in ["ukuran", "size", "mm", "cm"]):
-            clarifications.append("size")
-
-        if "hollow" in products and "galvanis" not in query and "hitam" not in query:
-            clarifications.append("material_type")
-
-        return clarifications
+    async def analyze(
+        self,
+        query: str,
+        conversation_context: Optional[List[MessageDTO]] = None
+    ) -> QueryIntent:
+        """Delegate query analysis to infrastructure implementation"""
+        return await self.analyzer_port.analyze(query, conversation_context)
 ```
 
 ### Deliverables
@@ -629,7 +698,7 @@ class QueryAnalyzer:
 
 ---
 
-## Phase 3: Mock Infrastructure (Day 2-3)
+## Phase 3: Mock Infrastructure (Day 2)
 
 ### Objectives
 
@@ -908,16 +977,133 @@ class MockRedisClient:
             del self.expiry[key]
 ```
 
+### 3.5 Mock Query Analyzer
+
+```python
+# src/infrastructure/mocks/mock_query_analyzer.py
+from typing import Dict, Any, Optional, List
+from src.application.ports import QueryAnalyzerPort
+from src.domain.value_objects import QueryIntent, ClarificationNeeded, ConversationContext
+
+class MockQueryAnalyzer(QueryAnalyzerPort):
+    """Mock query analyzer for testing and development"""
+
+    def __init__(self):
+        # Predefined patterns for mock intent analysis
+        self.patterns = {
+            "product_inquiry": [
+                "plat", "hollow", "besi", "pipa", "profil",
+                "siku", "unp", "wf", "h-beam", "cnp"
+            ],
+            "price_check": [
+                "harga", "price", "berapa", "cost", "biaya"
+            ],
+            "availability_check": [
+                "stok", "stock", "tersedia", "ada", "available"
+            ],
+            "variant_selection": [
+                "ukuran", "size", "tebal", "thickness", "dimensi"
+            ]
+        }
+
+    async def analyze_intent(
+        self,
+        query: str,
+        context: Optional[Dict[str, Any]] = None
+    ) -> QueryIntent:
+        """Analyze query intent using pattern matching for mock implementation"""
+        query_lower = query.lower()
+
+        # Determine query type based on patterns
+        query_type = "general"
+        detected_attributes = {}
+        confidence = 0.5
+
+        # Check for product inquiries
+        for product in self.patterns["product_inquiry"]:
+            if product in query_lower:
+                query_type = "product_inquiry"
+                detected_attributes["product_type"] = product
+                confidence = 0.8
+                break
+
+        # Check for price queries
+        if any(word in query_lower for word in self.patterns["price_check"]):
+            if query_type == "product_inquiry":
+                query_type = "price_check"
+                confidence = 0.9
+            else:
+                query_type = "price_check"
+                confidence = 0.7
+
+        # Check for availability
+        if any(word in query_lower for word in self.patterns["availability_check"]):
+            if query_type == "product_inquiry":
+                query_type = "availability_check"
+                confidence = 0.9
+            else:
+                query_type = "availability_check"
+                confidence = 0.7
+
+        # Check for variant selection
+        if any(word in query_lower for word in self.patterns["variant_selection"]):
+            query_type = "variant_selection"
+            confidence = 0.85
+
+        # Create mock conversation context
+        conversation_context = ConversationContext(
+            resolved_attributes=detected_attributes,
+            pending_clarifications=[],
+            conversation_history=[],
+            attribute_confidence={"product_type": confidence} if "product_type" in detected_attributes else {}
+        )
+
+        # Determine clarification stage based on context
+        clarification_stage = "initial"
+        if context and context.get("conversation_turn", 1) > 1:
+            if detected_attributes:
+                clarification_stage = "narrowing"
+            if confidence > 0.85:
+                clarification_stage = "confirming"
+
+        # Create QueryIntent
+        return QueryIntent(
+            type=query_type,
+            clarification_stage=clarification_stage,
+            query_level="product" if query_type == "product_inquiry" else "ambiguous",
+            conversation_context=conversation_context,
+            conversation_turn=context.get("conversation_turn", 1) if context else 1,
+            next_action="provide_info" if confidence > 0.8 else "request_clarification",
+            original_query=query,
+            current_query=query,
+            detected_attributes=detected_attributes,
+            confidence=confidence,
+            requires_human_intervention=False,
+            product_name=detected_attributes.get("product_type"),
+            quantity=self._extract_quantity(query_lower)
+        )
+
+    def _extract_quantity(self, query: str) -> Optional[int]:
+        """Extract quantity from query if present"""
+        import re
+        numbers = re.findall(r'\d+', query)
+        if numbers:
+            # Simple heuristic: return first number found
+            return int(numbers[0])
+        return None
+```
+
 ### Deliverables
 
 - ✅ Mock AI agent with Indonesian responses
 - ✅ Mock product repository with sample data
 - ✅ In-memory conversation storage
 - ✅ Mock Redis client
+- ✅ Mock query analyzer for development
 
 ---
 
-## Phase 4: WebSocket Integration (Day 3-4)
+## Phase 4: WebSocket Integration (Day 3)
 
 ### Objectives
 
@@ -1259,7 +1445,7 @@ async def websocket_endpoint(
 
 ---
 
-## Phase 5: AI Agent Integration (Day 4-5)
+## Phase 5: Integration & Testing (Day 4-5)
 
 ### Objectives
 
@@ -1268,232 +1454,184 @@ async def websocket_endpoint(
 - Implement PIM tools
 - Test complete flow
 
-### 5.1 PydanticAI Agent Configuration
+### 5.1 Single Agent Implementation with PydanticAI
+
+#### 5.1.1 Chat Agent with Tools
 
 ```python
-# src/infrastructure/ai/pydantic_agent.py
-from pydantic_ai import Agent
+# src/infrastructure/ai/llm_query_analyzer.py
 from typing import List, Optional
+from pydantic_ai import Agent
+from src.application.ports.query_analyzer_port import QueryAnalyzerPort
+from src.domain.value_objects import QueryIntent, ConversationContext
+from src.application.dto import MessageDTO
 import logging
-from src.application.ports import AIAgentPort
-from src.domain.value_objects import ProductInfo, VariantInfo
 
 logger = logging.getLogger(__name__)
 
-class SteelProductAgent(AIAgentPort):
-    """PydanticAI agent for steel product inquiries"""
+class ChatAgent:
+    """Single chat agent with tool calling using PydanticAI"
+
+    SYSTEM_PROMPT = """
+    You are PERKY, AI assistant for SMS Perkasa steel products, helping B2B customers in Indonesia.
+
+    IMPORTANT:
+    1. ALWAYS respond in Indonesian unless the user writes in English
+    2. Use professional yet friendly language
+    3. Understand local steel terminology (plat, besi beton, hollow, etc.)
+    4. You have access to tools for searching products and checking stock
+    5. Use tools when users ask about specific products, prices, or availability
+    """
 
     def __init__(self, product_service, openai_api_key: str):
         self.product_service = product_service
-
-        # System prompt in Indonesian
-        self.system_prompt = """
-Anda adalah PERKY, AI asisten spesialis produk baja dari SMS Perkasa, yang membantu pelanggan B2B Indonesia.
-
-PETUNJUK PENTING:
-1. SELALU jawab dalam Bahasa Indonesia, kecuali user bertanya dalam bahasa Inggris
-2. Gunakan bahasa yang profesional namun ramah
-3. Pahami istilah lokal/slang untuk produk baja (misal: "plat", "besi beton", "hollow")
-4. Berikan informasi akurat tentang produk, harga, dan stok
-5. Jika data tidak tersedia, informasikan dengan jelas
-
-FORMAT JAWABAN:
-- Salam pembuka yang sopan
-- Informasi produk yang diminta (nama, SKU, spesifikasi)
-- Harga dan ketersediaan stok
-- Tawaran bantuan lebih lanjut
-
-CONTOH:
-"Selamat pagi Pak/Bu! Untuk plat baja 5mm yang Bapak/Ibu tanyakan:
-- Produk: Plat Hitam SS400 5mm x 4ft x 8ft
-- SKU: PLT-5MM-SS400
-- Harga: Rp 125.000/lembar
-- Stok: Tersedia (150 lembar)
-Ada yang bisa saya bantu lagi?"
-"""
-
-        # Initialize PydanticAI agent
         self.agent = Agent(
             model="gpt-4o-mini",
-            system_prompt=self.system_prompt,
-            temperature=0.3,
-            max_retries=2
+            system_prompt=self.SYSTEM_PROMPT,
+            temperature=0.7
         )
-
-        # Register tools
         self._register_tools()
 
     def _register_tools(self):
-        """Register agent tools"""
+        """Register product search and stock check tools"""
 
         @self.agent.tool
         async def search_products(query: str) -> List[dict]:
             """Search for products by query"""
-            try:
-                products = await self.product_service.search_products(query)
-                return [
-                    {
-                        "product_id": p.product_id,
-                        "name": p.name,
-                        "description": p.description,
-                        "category": p.category
-                    }
-                    for p in products
-                ]
-            except Exception as e:
-                logger.error(f"Product search error: {e}")
-                return []
-
-        @self.agent.tool
-        async def get_product_details(product_id: str) -> dict:
-            """Get product with variants"""
-            try:
-                product_with_variants = await self.product_service.get_product_with_variants(product_id)
-                if not product_with_variants:
-                    return {}
-
-                return {
-                    "product": {
-                        "name": product_with_variants.product.name,
-                        "description": product_with_variants.product.description
-                    },
-                    "variants": [
-                        {
-                            "sku": v.sku,
-                            "name": v.name,
-                            "size": v.size,
-                            "price": v.price,
-                            "stock": v.stock_quantity
-                        }
-                        for v in product_with_variants.variants
-                    ]
-                }
-            except Exception as e:
-                logger.error(f"Product details error: {e}")
-                return {}
+            products = await self.product_service.search_products(query)
+            return [p.dict() for p in products[:5]]  # Return top 5
 
         @self.agent.tool
         async def check_stock(sku: str) -> dict:
-            """Check stock availability"""
-            try:
-                variant = await self.product_service.get_variant_by_sku(sku)
-                if not variant:
-                    return {"available": False}
-
+            """Check stock availability for a product SKU"""
+            variant = await self.product_service.get_variant_by_sku(sku)
+            if variant:
                 return {
                     "sku": variant.sku,
                     "available": variant.stock_quantity > 0,
-                    "quantity": variant.stock_quantity,
-                    "unit": variant.unit
+                    "quantity": variant.stock_quantity
                 }
-            except Exception as e:
-                logger.error(f"Stock check error: {e}")
-                return {"available": False}
+            return {"sku": sku, "available": False}
 
-    async def generate_response(
-        self,
-        message: str,
-        conversation_context: Optional[List] = None
-    ) -> str:
-        """Generate AI response"""
+    async def run(self, message: str, conversation_context: dict) -> str:
+        """Process message and return response"""
         try:
-            # Build context string
-            context = ""
-            if conversation_context:
-                context = "\n".join([
-                    f"{msg.sender_type}: {msg.content}"
-                    for msg in conversation_context[-3:]  # Last 3 messages
-                ])
-
-            # Generate response
-            full_message = f"{context}\nUser: {message}" if context else message
-            result = await self.agent.run(full_message)
-
+            result = await self.agent.run(message, context=conversation_context)
             return result.data
-
         except Exception as e:
-            logger.error(f"AI generation error: {e}")
-            return "Maaf, terjadi kesalahan sistem. Silakan coba beberapa saat lagi."
+            logger.error(f"Chat agent error: {e}")
+            return "Maaf, terjadi kesalahan. Silakan coba lagi."
+
 ```
 
-### 5.2 Dependency Injection Configuration
+#### 5.1.2 Mock Product Service
+
+```python
+# src/infrastructure/services/mock_product_service.py
+from typing import List, Optional
+from src.domain.value_objects import ProductInfo, VariantInfo
+
+class MockProductService:
+    """Mock product service with sample data for internal MVP"""
+
+    def __init__(self):
+        self.products = [
+            {
+                "product_id": "PLAT-001",
+                "name": "Plat Baja SS400",
+                "description": "Plat baja kualitas JIS SS400",
+                "category": "plat",
+                "variants": [
+                    {"sku": "PLAT-SS400-5MM", "size": "5mm x 1200 x 2400", "price": 850000, "stock": 50},
+                    {"sku": "PLAT-SS400-10MM", "size": "10mm x 1200 x 2400", "price": 1700000, "stock": 30}
+                ]
+            },
+            {
+                "product_id": "BESI-001",
+                "name": "Besi Beton SNI",
+                "description": "Besi beton ulir standar SNI",
+                "category": "besi_beton",
+                "variants": [
+                    {"sku": "BESI-SNI-10MM", "size": "10mm x 12m", "price": 95000, "stock": 100},
+                    {"sku": "BESI-SNI-12MM", "size": "12mm x 12m", "price": 135000, "stock": 80}
+                ]
+            },
+            {
+                "product_id": "HBEAM-001",
+                "name": "H-Beam",
+                "description": "H-Beam struktural",
+                "category": "h_beam",
+                "variants": [
+                    {"sku": "HBEAM-200X200", "size": "200x200x8x12 mm", "price": 2500000, "stock": 20}
+                ]
+            }
+        ]
+
+    async def search_products(self, query: str) -> List[ProductInfo]:
+        """Search mock products"""
+        results = []
+        query_lower = query.lower()
+        for product in self.products:
+            if query_lower in product["name"].lower() or query_lower in product["category"]:
+                results.append(ProductInfo(
+                    product_id=product["product_id"],
+                    name=product["name"],
+                    description=product["description"],
+                    category=product["category"]
+                ))
+        return results
+
+    async def get_variant_by_sku(self, sku: str) -> Optional[VariantInfo]:
+        """Get variant by SKU"""
+        for product in self.products:
+            for variant in product["variants"]:
+                if variant["sku"] == sku:
+                    return VariantInfo(
+                        sku=variant["sku"],
+                        name=product["name"],
+                        size=variant["size"],
+                        price=variant["price"],
+                        stock_quantity=variant["stock"]
+                    )
+        return None
+```
+
+### 5.2 Simple Dependency Injection
 
 ```python
 # src/presentation/dependencies.py
-from functools import lru_cache
-from src.application.container import container
-from src.application.services import ChatOrchestrator
-from src.application.use_cases import (
-    StartChatSessionUseCaseImpl,
-    ProcessUserMessageUseCaseImpl,
-    GetConversationUseCaseImpl
-)
-from src.infrastructure.mocks import (
-    MockAIAgent,
-    MockProductRepository,
-    MockConversationRepository,
-    MockRedisClient
-)
-from src.application.services import QueryAnalyzer
+from src.infrastructure.ai import ChatAgent
+from src.infrastructure.services import MockProductService
+from src.infrastructure.repositories import InMemoryConversationRepository
+from src.application.use_cases import ProcessUserMessageUseCaseImpl
 from src.core.config import settings
 
-@lru_cache()
-def get_container():
-    """Get configured DI container"""
+def get_dependencies():
+    """Get configured dependencies for internal MVP"""
 
-    # Register infrastructure services (mocks for MVP)
-    container.register("redis_client", MockRedisClient, singleton=True)
-    container.register("product_repository", MockProductRepository, singleton=True)
-    container.register("conversation_repository", MockConversationRepository, singleton=True)
-    container.register("ai_agent", MockAIAgent, singleton=True)
-    container.register("query_analyzer", QueryAnalyzer, singleton=True)
+    # Mock services
+    product_service = MockProductService()
+    conversation_repository = InMemoryConversationRepository()
 
-    # Register use cases
-    container.register(
-        "start_session_use_case",
-        lambda: StartChatSessionUseCaseImpl(
-            session_repository=None,  # Not needed for MVP
-            redis_client=container.resolve("redis_client")
-        ),
-        singleton=True
+    # Single chat agent
+    chat_agent = ChatAgent(
+        product_service=product_service,
+        openai_api_key=settings.OPENAI_API_KEY
     )
 
-    container.register(
-        "process_message_use_case",
-        lambda: ProcessUserMessageUseCaseImpl(
-            ai_agent=container.resolve("ai_agent"),
-            product_service=container.resolve("product_repository"),
-            conversation_repository=container.resolve("conversation_repository"),
-            query_analyzer=container.resolve("query_analyzer")
-        ),
-        singleton=True
+    # Use case with single agent
+    process_message_use_case = ProcessUserMessageUseCaseImpl(
+        chat_agent=chat_agent,
+        product_service=product_service,
+        conversation_repository=conversation_repository
     )
 
-    container.register(
-        "get_conversation_use_case",
-        lambda: GetConversationUseCaseImpl(
-            conversation_repository=container.resolve("conversation_repository")
-        ),
-        singleton=True
-    )
-
-    # Register orchestrator
-    container.register(
-        "chat_orchestrator",
-        lambda: ChatOrchestrator(
-            start_session_use_case=container.resolve("start_session_use_case"),
-            process_message_use_case=container.resolve("process_message_use_case"),
-            get_conversation_use_case=container.resolve("get_conversation_use_case")
-        ),
-        singleton=True
-    )
-
-    return container
-
-def get_chat_orchestrator():
-    """Get chat orchestrator instance"""
-    container = get_container()
-    return container.resolve("chat_orchestrator")
+    return {
+        "chat_agent": chat_agent,
+        "product_service": product_service,
+        "conversation_repository": conversation_repository,
+        "process_message_use_case": process_message_use_case
+    }
 ```
 
 ### 5.3 Main Application Update
@@ -1666,6 +1804,10 @@ echo "E2E Test Complete"
 
 ## Deployment & Validation
 
+### Internal MVP Deployment
+
+Simplified deployment for internal testing:
+
 ### Local Development
 
 ```bash
@@ -1725,6 +1867,10 @@ docker run -p 8000:8000 steel-chat-mvp
 
 ## Risk Mitigation
 
+### Internal MVP Risks
+
+Reduced risk profile for internal testing:
+
 ### Technical Risks
 
 | Risk | Impact | Mitigation |
@@ -1746,6 +1892,13 @@ docker run -p 8000:8000 steel-chat-mvp
 ---
 
 ## Success Criteria
+
+### Internal MVP Success Metrics
+
+1. **Functional**: Chat responds to 3 core scenarios
+2. **Performance**: Response time < 5 seconds
+3. **Reliability**: No crashes during demo
+4. **Usability**: Internal team can test without assistance
 
 ### Functional Requirements
 
@@ -1797,105 +1950,101 @@ docker run -p 8000:8000 steel-chat-mvp
 
 ---
 
-## Appendix A: File Structure
+## Summary
+
+This internal MVP implementation plan provides a streamlined approach to building the Steel Chat system
+in 5 days using a walking skeleton approach.
+
+### Key Simplifications from Production Plan
+
+1. **Single Agent Architecture**: Replaced dual-agent system with single PydanticAI agent using tool calling
+2. **Mock Infrastructure**: Using hardcoded product data instead of real PIM integration
+3. **Minimal Testing**: Focus on manual testing of 3 core scenarios
+4. **No Production Requirements**: Removed security, monitoring, and performance optimization
+5. **Simplified Dependencies**: Basic dependency injection without complex container patterns
+
+### Three Core Scenarios for Demo
+
+1. **Product Search**: "Ada plat baja 5mm?"
+   - Agent uses search_products tool
+   - Returns matching products from mock data
+   - Responds in Indonesian with product details
+
+2. **Price Inquiry**: "Berapa harga besi beton 10mm?"
+   - Agent searches for product
+   - Retrieves price from mock data
+   - Provides price information
+
+3. **Availability Check**: "Stock H-beam 200x200 ada?"
+   - Agent uses check_stock tool
+   - Returns availability from mock data
+   - Confirms stock quantity
+
+### Next Steps After Internal MVP
+
+1. **Gather Feedback**: Test with internal team to validate approach
+2. **Refine Agent Prompts**: Improve response quality based on testing
+3. **Add More Products**: Expand mock data to cover more scenarios
+4. **Consider Production Requirements**: Add security, monitoring, and real PIM integration
+5. **Scale Architecture**: Consider dual-agent if complexity warrants it
+
+---
+
+## File Structure for Internal MVP
 
 ```text
 src/
 ├── application/
 │   ├── dto/
-│   │   ├── __init__.py
-│   │   ├── message_dto.py
-│   │   ├── conversation_dto.py
-│   │   ├── session_dto.py
-│   │   └── product_query_dto.py
-│   ├── use_cases/
-│   │   ├── __init__.py
-│   │   ├── interfaces.py
-│   │   ├── start_chat_session.py
-│   │   ├── process_user_message.py
-│   │   └── get_conversation.py
-│   ├── services/
-│   │   ├── __init__.py
-│   │   ├── chat_orchestrator.py
-│   │   └── query_analyzer.py
-│   ├── ports/
-│   │   ├── __init__.py
-│   │   ├── ai_agent_port.py
-│   │   └── product_service_port.py
-│   └── container.py
+│   │   └── message_dto.py
+│   └── use_cases/
+│       └── process_message.py
 ├── infrastructure/
-│   ├── mocks/
-│   │   ├── __init__.py
-│   │   ├── mock_ai_agent.py
-│   │   ├── mock_product_repository.py
-│   │   ├── mock_conversation_repository.py
-│   │   └── mock_redis_client.py
-│   └── ai/
-│       ├── __init__.py
-│       └── pydantic_agent.py
+│   ├── ai/
+│   │   └── chat_agent.py  # Single PydanticAI agent
+│   ├── services/
+│   │   └── mock_product_service.py  # Mock product data
+│   └── repositories/
+│       └── in_memory_conversation.py
 ├── presentation/
 │   ├── websocket/
-│   │   ├── __init__.py
-│   │   ├── connection_manager.py
 │   │   └── chat_ws.py
-│   ├── api/
-│   │   └── v1/
-│   │       └── websocket.py
 │   └── dependencies.py
 └── main.py
 ```
 
 ---
 
-## Appendix B: Environment Variables
+## Environment Variables for Internal MVP
 
 ```env
-# .env file for MVP
+# .env file for Internal MVP
 
 # Application
-PROJECT_NAME="Steel Chat MVP"
+PROJECT_NAME="Steel Chat Internal MVP"
 VERSION="0.1.0"
 API_V1_STR="/api/v1"
 
-# CORS
-BACKEND_CORS_ORIGINS=["http://localhost:3000","http://localhost:8000"]
-
-# Database (not used in MVP)
-POSTGRES_SERVER=localhost
-POSTGRES_USER=postgres
-POSTGRES_PASSWORD=postgres
-POSTGRES_DB=steel_chat
-
-# Redis (mock for MVP)
-REDIS_URL=redis://localhost:6379
-REDIS_SESSION_TTL=3600
-REDIS_CACHE_TTL=900
-
-# PIM Integration (mock for MVP)
-PERKY_OS_API_URL=https://api.perkyos.com/v1
-PERKY_OS_JWT_SECRET=your-jwt-secret
-PERKY_OS_TIMEOUT=5000
-
-# OpenAI (optional for MVP)
+# OpenAI (required)
 OPENAI_API_KEY=sk-...
 OPENAI_MODEL=gpt-4o-mini
-OPENAI_TEMPERATURE=0.3
-OPENAI_MAX_RETRIES=2
+OPENAI_TEMPERATURE=0.7
 
-# WebSocket
-WS_HEARTBEAT_INTERVAL=30
-WS_MAX_CONNECTIONS=100
-WS_MESSAGE_RATE_LIMIT=10
-
-# Security
-SECRET_KEY=your-secret-key-here
-ALGORITHM=HS256
-ACCESS_TOKEN_EXPIRE_MINUTES=30
+# Mock Mode
+USE_MOCK_MODE=true
 ```
 
 ---
 
 ## Conclusion
+
+This simplified implementation plan provides a clear path to building an internal MVP of the Steel Chat
+system in 5 days. By using a single PydanticAI agent with tools instead of a dual-agent architecture,
+mock product data instead of real PIM integration, and focusing on 3 core scenarios, the team can
+quickly validate the approach and gather feedback before investing in production features.
+
+The walking skeleton approach ensures that all layers are connected and working, providing a solid
+foundation for iterative development after the initial MVP is complete.
 
 This MVP implementation plan provides a **working chat system in 5 days** that:
 

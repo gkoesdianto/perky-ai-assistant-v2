@@ -8,7 +8,7 @@ from src.domain.value_objects.query_intent import (
     ClarificationNeeded,
     ConversationContext,
 )
-from tests.unit.domain.factories import QueryIntentFactory
+from tests.factories import QueryIntentFactory
 
 
 class TestClarificationNeeded:
