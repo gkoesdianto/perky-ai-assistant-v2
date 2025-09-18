@@ -12,6 +12,109 @@ class MockAIAgentFactory(BaseFactory):
     """Factory for mock AI agent adapters."""
 
     @classmethod
+    def _create_tracking_wrapper(cls, tracking_mock):
+        """Create an async wrapper that tracks calls and handles side effects."""
+
+        async def tracking_wrapper(*args, **kwargs):
+            # Track the call
+            tracking_mock.call_count += 1
+            cls._track_arguments(tracking_mock, args, kwargs)
+
+            # Execute and return the appropriate response
+            return await cls._execute_side_effect(tracking_mock, args, kwargs)
+
+        return tracking_wrapper
+
+    @classmethod
+    def _track_arguments(cls, tracking_mock, args, kwargs):
+        """Track message and context from arguments."""
+        # Handle positional arguments
+        if args:
+            tracking_mock.last_message = args[0]
+            if len(args) > 1:
+                tracking_mock.last_context = args[1]
+        # Handle keyword arguments
+        elif "message" in kwargs:
+            tracking_mock.last_message = kwargs["message"]
+            if "conversation_context" in kwargs:
+                tracking_mock.last_context = kwargs["conversation_context"]
+
+        # Check for context in kwargs
+        if "context" in kwargs and tracking_mock.last_context is None:
+            tracking_mock.last_context = kwargs["context"]
+
+    @classmethod
+    async def _execute_side_effect(cls, tracking_mock, args, kwargs):
+        """Execute the appropriate side effect or return value."""
+        if not tracking_mock._side_effect:
+            return tracking_mock._return_value
+
+        # Handle callable side effects
+        if callable(tracking_mock._side_effect):
+            if asyncio.iscoroutinefunction(tracking_mock._side_effect):
+                return await tracking_mock._side_effect(*args, **kwargs)
+            else:
+                result = tracking_mock._side_effect(*args, **kwargs)
+                if asyncio.iscoroutine(result):
+                    return await result
+                return result
+
+        # Handle iterator side effects
+        elif tracking_mock._side_effect_iter:
+            try:
+                return next(tracking_mock._side_effect_iter)
+            except StopIteration:
+                raise StopIteration("Mock side_effect exhausted")
+        else:
+            # Fallback for edge cases
+            return next(iter(tracking_mock._side_effect))
+
+    @classmethod
+    def _setup_property_interceptors(cls, tracking_mock):
+        """Set up property interceptors for return_value and side_effect."""
+
+        def set_return_value(mock_self, value):
+            tracking_mock._return_value = value
+
+        def set_side_effect(mock_self, value):
+            if value is None:
+                tracking_mock._side_effect = None
+                tracking_mock._side_effect_iter = None
+            else:
+                tracking_mock._side_effect = value
+                # Create iterator if it's a list
+                if isinstance(value, (list, tuple)):
+                    tracking_mock._side_effect_iter = iter(value)
+                else:
+                    tracking_mock._side_effect_iter = None
+
+        # Replace the property setters
+        type(tracking_mock.generate_response).return_value = property(
+            type(tracking_mock.generate_response).return_value.fget, set_return_value
+        )
+        type(tracking_mock.generate_response).side_effect = property(
+            type(tracking_mock.generate_response).side_effect.fget, set_side_effect
+        )
+
+    @classmethod
+    def _create_reset_method(cls, tracking_mock, initial_response, tracking_wrapper):
+        """Create a reset method for the tracking mock."""
+
+        def reset():
+            tracking_mock.call_count = 0
+            tracking_mock.last_message = None
+            tracking_mock.last_context = None
+            tracking_mock._return_value = initial_response
+            tracking_mock._side_effect = None
+            tracking_mock._side_effect_iter = None
+            tracking_mock.generate_response.reset_mock()
+            # Re-apply tracking wrapper
+            tracking_mock.generate_response.side_effect = tracking_wrapper
+            tracking_mock.analyze_intent.reset_mock()
+
+        return reset
+
+    @classmethod
     def create(cls, **kwargs) -> AsyncMock:
         """Create mock AI agent with preset responses."""
 
@@ -27,52 +130,13 @@ class MockAIAgentFactory(BaseFactory):
                 response = kwargs.get("response", "Test AI response")
                 self._return_value = response
                 self._side_effect = None
+                self._side_effect_iter = None
 
                 # Create generate_response with tracking
                 self.generate_response = AsyncMock()
 
-                # Set up the tracking wrapper
-                async def tracking_wrapper(*args, **kwargs):
-                    # Track the call
-                    self.call_count += 1
-
-                    # Handle both positional and keyword arguments for message
-                    if args:
-                        self.last_message = args[0]
-                        if len(args) > 1:
-                            self.last_context = args[1]
-                    elif "message" in kwargs:
-                        self.last_message = kwargs["message"]
-                        if "conversation_context" in kwargs:
-                            self.last_context = kwargs["conversation_context"]
-
-                    # Also check for context in kwargs
-                    if "context" in kwargs and self.last_context is None:
-                        self.last_context = kwargs["context"]
-
-                    # Use side_effect if present, otherwise return_value
-                    if self._side_effect:
-                        if callable(self._side_effect):
-                            if asyncio.iscoroutinefunction(self._side_effect):
-                                return await self._side_effect(*args, **kwargs)
-                            else:
-                                result = self._side_effect(*args, **kwargs)
-                                if asyncio.iscoroutine(result):
-                                    return await result
-                                return result
-                        elif self._side_effect_iter:
-                            # It's a list/iterator - use the stored iterator
-                            try:
-                                return next(self._side_effect_iter)
-                            except StopIteration:
-                                raise StopIteration("Mock side_effect exhausted")
-                        else:
-                            # Shouldn't happen but fallback
-                            return next(iter(self._side_effect))
-                    else:
-                        return self._return_value
-
-                # Set our tracking wrapper
+                # Create and set up the tracking wrapper
+                tracking_wrapper = cls._create_tracking_wrapper(self)
                 self.generate_response.side_effect = tracking_wrapper
 
                 # Store original property setters
@@ -83,34 +147,8 @@ class MockAIAgentFactory(BaseFactory):
                     self.generate_response
                 ).side_effect.fset
 
-                # Keep track of the side_effect iterator if it's a list
-                self._side_effect_iter = None
-
-                # Intercept return_value and side_effect setters
-                def set_return_value(mock_self, value):
-                    self._return_value = value
-
-                def set_side_effect(mock_self, value):
-                    if value is None:
-                        self._side_effect = None
-                        self._side_effect_iter = None
-                        # Keep our tracking wrapper
-                    else:
-                        self._side_effect = value
-                        # Create iterator if it's a list
-                        if isinstance(value, (list, tuple)):
-                            self._side_effect_iter = iter(value)
-                        else:
-                            self._side_effect_iter = None
-                        # Keep our tracking wrapper active
-
-                # Replace the property setters
-                type(self.generate_response).return_value = property(
-                    type(self.generate_response).return_value.fget, set_return_value
-                )
-                type(self.generate_response).side_effect = property(
-                    type(self.generate_response).side_effect.fget, set_side_effect
-                )
+                # Set up property interceptors
+                cls._setup_property_interceptors(self)
 
                 # Add analyze_intent method
                 self.analyze_intent = AsyncMock(
@@ -118,19 +156,7 @@ class MockAIAgentFactory(BaseFactory):
                 )
 
                 # Add reset method
-                def reset():
-                    self.call_count = 0
-                    self.last_message = None
-                    self.last_context = None
-                    self._return_value = response
-                    self._side_effect = None
-                    self._side_effect_iter = None
-                    self.generate_response.reset_mock()
-                    # Re-apply tracking wrapper
-                    self.generate_response.side_effect = tracking_wrapper
-                    self.analyze_intent.reset_mock()
-
-                self.reset = reset
+                self.reset = cls._create_reset_method(self, response, tracking_wrapper)
 
                 # Forward any other attributes to the underlying mock
                 def __getattr__(self, name):
@@ -259,14 +285,9 @@ class MockRedisFactory(BaseFactory):
     """Factory for mock Redis clients."""
 
     @classmethod
-    def create(cls, **kwargs) -> MagicMock:
-        """Create mock Redis client with session storage."""
-        mock = MagicMock()
+    def _create_basic_operations(cls, mock):
+        """Create basic Redis operations."""
 
-        # Initialize storage
-        mock._storage = kwargs.get("storage", {})
-
-        # Implement Redis-like operations
         async def get(key):
             return mock._storage.get(key)
 
@@ -290,6 +311,12 @@ class MockRedisFactory(BaseFactory):
         async def exists(key):
             return 1 if key in mock._storage else 0
 
+        return get, set, delete, exists
+
+    @classmethod
+    def _create_expiry_operations(cls, mock):
+        """Create expiry-related Redis operations."""
+
         async def expire(key, seconds):
             if key in mock._storage:
                 mock._storage[f"_expiry_{key}"] = seconds
@@ -302,7 +329,12 @@ class MockRedisFactory(BaseFactory):
                 return mock._storage[expiry_key]
             return -1 if key in mock._storage else -2
 
-        # JSON operations
+        return expire, ttl
+
+    @classmethod
+    def _create_json_operations(cls, mock):
+        """Create JSON-related Redis operations."""
+
         async def json_get(key, path="."):
             value = mock._storage.get(key)
             if value and isinstance(value, str):
@@ -318,17 +350,12 @@ class MockRedisFactory(BaseFactory):
             )
             return True
 
-        # Attach methods to mock
-        mock.get = AsyncMock(side_effect=get)
-        mock.set = AsyncMock(side_effect=set)
-        mock.delete = AsyncMock(side_effect=delete)
-        mock.exists = AsyncMock(side_effect=exists)
-        mock.expire = AsyncMock(side_effect=expire)
-        mock.ttl = AsyncMock(side_effect=ttl)
-        mock.json.get = AsyncMock(side_effect=json_get)
-        mock.json.set = AsyncMock(side_effect=json_set)
+        return json_get, json_set
 
-        # Add reset method
+    @classmethod
+    def _create_reset_method(cls, mock):
+        """Create a reset method for the mock Redis."""
+
         def reset():
             mock._storage.clear()
             mock.get.reset_mock()
@@ -340,7 +367,37 @@ class MockRedisFactory(BaseFactory):
             mock.json.get.reset_mock()
             mock.json.set.reset_mock()
 
-        mock.reset = reset
+        return reset
+
+    @classmethod
+    def create(cls, **kwargs) -> MagicMock:
+        """Create mock Redis client with session storage."""
+        mock = MagicMock()
+
+        # Initialize storage
+        mock._storage = kwargs.get("storage", {})
+
+        # Create basic operations
+        get, set, delete, exists = cls._create_basic_operations(mock)
+
+        # Create expiry operations
+        expire, ttl = cls._create_expiry_operations(mock)
+
+        # Create JSON operations
+        json_get, json_set = cls._create_json_operations(mock)
+
+        # Attach methods to mock
+        mock.get = AsyncMock(side_effect=get)
+        mock.set = AsyncMock(side_effect=set)
+        mock.delete = AsyncMock(side_effect=delete)
+        mock.exists = AsyncMock(side_effect=exists)
+        mock.expire = AsyncMock(side_effect=expire)
+        mock.ttl = AsyncMock(side_effect=ttl)
+        mock.json.get = AsyncMock(side_effect=json_get)
+        mock.json.set = AsyncMock(side_effect=json_set)
+
+        # Add reset method
+        mock.reset = cls._create_reset_method(mock)
 
         return mock
 
