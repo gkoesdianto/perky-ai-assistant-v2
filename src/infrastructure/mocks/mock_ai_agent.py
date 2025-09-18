@@ -112,7 +112,9 @@ class MockAIAgent(AIAgentPort):
         ]
         # Use word boundaries to avoid false matches
         words = message.split()
-        return any(word in greeting_words for word in words) or message.startswith("selamat")
+        return any(word in greeting_words for word in words) or message.startswith(
+            "selamat"
+        )
 
     def _check_price_inquiry(self, message_lower: str) -> Optional[str]:
         """Check if message is a price inquiry and return appropriate response."""
