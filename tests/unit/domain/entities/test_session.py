@@ -9,7 +9,7 @@ from concurrent.futures import ThreadPoolExecutor
 
 from src.domain.entities.session import Session
 from src.domain.entities.base import BaseEntity
-from tests.unit.domain.factories import SessionFactory
+from tests.factories import SessionFactory
 
 
 class TestSessionCreation:

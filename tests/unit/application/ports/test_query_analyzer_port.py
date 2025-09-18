@@ -12,7 +12,7 @@ from src.domain.value_objects.query_intent import (
     ConversationContext,
     QueryIntent,
 )
-from tests.unit.domain.factories import QueryIntentFactory
+from tests.factories import QueryIntentFactory
 
 
 @pytest.mark.asyncio

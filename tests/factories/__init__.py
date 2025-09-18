@@ -6,7 +6,7 @@ from .domain import (
     ConversationFactory,
     MessageFactory,
     ProductFactory,
-    VariantFactory,
+    VariantInfoFactory,
     QueryIntentFactory,
 )
 from .mocks import (
@@ -26,7 +26,7 @@ __all__ = [
     'ConversationFactory',
     'MessageFactory',
     'ProductFactory',
-    'VariantFactory',
+    'VariantInfoFactory',
     'QueryIntentFactory',
     'MockAIAgentFactory',
     'MockProductServiceFactory',

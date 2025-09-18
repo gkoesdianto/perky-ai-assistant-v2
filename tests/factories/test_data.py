@@ -130,12 +130,12 @@ class ProductWithVariantsFactory(BaseFactory[ProductWithVariantsInfo]):
     @classmethod
     def _get_defaults(cls) -> Dict[str, Any]:
         """Get defaults for ProductWithVariantsInfo."""
-        from tests.factories.domain import ProductFactory, VariantFactory
+        from tests.factories.domain import ProductFactory, VariantInfoFactory
 
         product = ProductFactory.steel_plate()
         variants = [
-            VariantFactory.steel_plate_10mm(),
-            VariantFactory.steel_plate_5mm(),
+            VariantInfoFactory.steel_plate_10mm(),
+            VariantInfoFactory.steel_plate_5mm(),
         ]
 
         return {
@@ -146,13 +146,13 @@ class ProductWithVariantsFactory(BaseFactory[ProductWithVariantsInfo]):
     @classmethod
     def create_steel_plate_complete(cls, **kwargs) -> ProductWithVariantsInfo:
         """Create complete steel plate with multiple variants."""
-        from tests.factories.domain import ProductFactory, VariantFactory
+        from tests.factories.domain import ProductFactory, VariantInfoFactory
 
         product = ProductFactory.steel_plate()
         variants = [
-            VariantFactory.steel_plate_10mm(),
-            VariantFactory.steel_plate_5mm(),
-            VariantFactory.create(
+            VariantInfoFactory.steel_plate_10mm(),
+            VariantInfoFactory.steel_plate_5mm(),
+            VariantInfoFactory.create(
                 variant_id='var_003',
                 sku='PLT-15MM-001',
                 product_id='prod_plat_baja',
@@ -179,10 +179,10 @@ class ProductWithVariantsFactory(BaseFactory[ProductWithVariantsInfo]):
     @classmethod
     def create_minimal(cls, **kwargs) -> ProductWithVariantsInfo:
         """Create minimal product with single variant."""
-        from tests.factories.domain import ProductFactory, VariantFactory
+        from tests.factories.domain import ProductFactory, VariantInfoFactory
 
         product = ProductFactory.minimal()
-        variants = [VariantFactory.create(product_id=product.product_id)]
+        variants = [VariantInfoFactory.create(product_id=product.product_id)]
 
         defaults = {
             'product': product,
@@ -228,7 +228,7 @@ class TestDataPresets:
     @classmethod
     def create_product_search_scenario(cls):
         """Create a product search scenario with query and results."""
-        from tests.factories.domain import ProductFactory, VariantFactory
+        from tests.factories.domain import ProductFactory, VariantInfoFactory
 
         # Create products
         products = [
@@ -239,8 +239,8 @@ class TestDataPresets:
 
         # Create variants for first product
         variants = [
-            VariantFactory.steel_plate_10mm(),
-            VariantFactory.steel_plate_5mm(),
+            VariantInfoFactory.steel_plate_10mm(),
+            VariantInfoFactory.steel_plate_5mm(),
         ]
 
         # Create query

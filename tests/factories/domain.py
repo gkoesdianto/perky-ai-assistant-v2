@@ -148,6 +148,22 @@ class MessageFactory(BaseFactory[Message]):
         defaults.update(kwargs)
         return cls.create(**defaults)
 
+    # Backward compatibility aliases
+    @classmethod
+    def create_user_message(cls, **kwargs) -> Message:
+        """Alias for backward compatibility."""
+        return cls.user_message(**kwargs)
+
+    @classmethod
+    def create_ai_message(cls, **kwargs) -> Message:
+        """Alias for backward compatibility."""
+        return cls.ai_message(**kwargs)
+
+    @classmethod
+    def create_product_query(cls, **kwargs) -> Message:
+        """Alias for backward compatibility."""
+        return cls.product_query(**kwargs)
+
 
 class ProductFactory(BaseFactory[ProductInfo]):
     """Unified product factory replacing duplicate implementations."""
@@ -215,8 +231,15 @@ class ProductFactory(BaseFactory[ProductInfo]):
         """Alias for backward compatibility."""
         return cls.complete(**kwargs)
 
+    @classmethod
+    def create_from_cache(cls, **kwargs) -> ProductInfo:
+        """Create a product marked as from cache."""
+        defaults = {"source": "cache"}
+        defaults.update(kwargs)
+        return cls.create(**defaults)
 
-class VariantFactory(BaseFactory[VariantInfo]):
+
+class VariantInfoFactory(BaseFactory[VariantInfo]):
     """Factory for VariantInfo value objects."""
 
     _model = VariantInfo
@@ -290,6 +313,105 @@ class VariantFactory(BaseFactory[VariantInfo]):
         """Alias for backward compatibility."""
         return cls.steel_plate_5mm(**kwargs)
 
+    @classmethod
+    def create_out_of_stock(cls, **kwargs) -> VariantInfo:
+        """Create a variant that is out of stock."""
+        defaults = {"stock_quantity": 0, "is_available": False}
+        defaults.update(kwargs)
+        return cls.create(**defaults)
+
+    @classmethod
+    def create_unavailable(cls, **kwargs) -> VariantInfo:
+        """Create an unavailable variant."""
+        defaults = {"is_available": False, "stock_quantity": 100}
+        defaults.update(kwargs)
+        return cls.create(**defaults)
+
+    @classmethod
+    def create_steel(cls, **kwargs) -> VariantInfo:
+        """Create a generic steel variant."""
+        return cls.steel_plate_10mm(**kwargs)
+
+    @classmethod
+    def create_hollow(cls, **kwargs) -> VariantInfo:
+        """Create a hollow steel variant."""
+        defaults = {
+            "variant_id": "var_hollow",
+            "sku": "HOLLOW-40x40-001",
+            "product_id": "prod_hollow",
+            "variant_name": "Hollow 40x40x2mm x 6000mm",
+            "price": Decimal("125000"),
+            "stock_quantity": 100,
+            "stock_unit": "batang",
+            "specifications": {
+                "size": "40x40mm",
+                "thickness": "2mm",
+                "length": "6000mm",
+            },
+        }
+        defaults.update(kwargs)
+        return cls.create(**defaults)
+
+    @classmethod
+    def create_steel_variant(cls, **kwargs) -> VariantInfo:
+        """Create a steel variant with specific attributes."""
+        defaults = {
+            "variant_id": "var_steel_001",
+            "sku": "PLT-5MM-001",
+            "product_id": "prod_plat_baja",
+            "variant_name": "Plat Baja 5mm x 1200mm x 2400mm",
+            "price": Decimal("500000"),
+            "stock_quantity": 50,
+            "stock_unit": "lembar",
+            "specifications": {
+                "thickness": "5mm",
+                "width": "1200mm",
+                "length": "2400mm",
+                "grade": "SS400",
+            },
+        }
+        defaults.update(kwargs)
+        return cls.create(**defaults)
+
+    @classmethod
+    def create_from_cache(cls, **kwargs) -> VariantInfo:
+        """Create a variant marked as from cache."""
+        defaults = {
+            "source": "cache",
+            "sku": f"CACHE-{uuid.uuid4().hex[:8]}"
+        }
+        defaults.update(kwargs)
+        return cls.create(**defaults)
+
+    @classmethod
+    def create_with_specifications(cls, specifications: Dict[str, Any], **kwargs) -> VariantInfo:
+        """Create a variant with specific specifications."""
+        defaults = {"specifications": specifications}
+        defaults.update(kwargs)
+        return cls.create(**defaults)
+
+    @classmethod
+    def create_hollow_variant(cls, material: str = "hitam", dimensions: str = "40x40", **kwargs) -> VariantInfo:
+        """Create a hollow variant with specific material and dimensions."""
+        defaults = {
+            "variant_id": f"var_hollow_{material}_{dimensions.replace('x', '_')}",
+            "sku": f"HOLLOW-{material.upper()}-{dimensions}",
+            "product_id": "prod_hollow",
+            "variant_name": f"Hollow {dimensions} {material}",
+            "price": Decimal("150000"),
+            "stock_quantity": 75,
+            "stock_unit": "batang",
+            "specifications": {
+                "material": material,
+                "dimensions": dimensions,
+                "size": f"{dimensions}mm",
+                "thickness": "2mm",
+                "length": "6000mm",
+            },
+        }
+        defaults.update(kwargs)
+        return cls.create(**defaults)
+
 
 class QueryIntentFactory(BaseFactory[QueryIntent]):
     """Factory for QueryIntent value objects."""
@@ -303,8 +425,9 @@ class QueryIntentFactory(BaseFactory[QueryIntent]):
             "type": "general",
             "original_query": "Test query",
             "current_query": "Test query",
-            "confidence": 0.85,  # Updated to match test expectations
+            "confidence": 0.85,
             "detected_attributes": {},
+            "clarification_stage": "complete",  # Add default to match test expectations
         }
 
     # Presets
@@ -351,10 +474,11 @@ class QueryIntentFactory(BaseFactory[QueryIntent]):
         """Create an availability check intent."""
         defaults = {
             "type": "availability_check",
-            "original_query": "Apakah plat baja tersedia?",
-            "current_query": "Apakah plat baja tersedia?",
+            "original_query": "Ada stok plat?",
+            "current_query": "Ada stok plat?",
             "confidence": 0.92,
-            "detected_attributes": {"product": "plat baja"},
+            "clarification_stage": "narrowing",
+            "next_action": "request_clarification",
             "product_name": "plat baja SS400",
             "quantity": 10,
         }
@@ -365,3 +489,27 @@ class QueryIntentFactory(BaseFactory[QueryIntent]):
     def create_availability_check(cls, **kwargs) -> QueryIntent:
         """Alias for backward compatibility."""
         return cls.availability_check(**kwargs)
+
+    @classmethod
+    def create_with_high_confidence(cls, **kwargs) -> QueryIntent:
+        """Create a query intent with high confidence."""
+        defaults = {"confidence": 0.99}
+        defaults.update(kwargs)
+        return cls.create(**defaults)
+
+    @classmethod
+    def create_with_low_confidence(cls, **kwargs) -> QueryIntent:
+        """Create a query intent with low confidence."""
+        defaults = {"confidence": 0.3}
+        defaults.update(kwargs)
+        return cls.create(**defaults)
+
+    @classmethod
+    def create_general_query(cls, **kwargs) -> QueryIntent:
+        """Create a general query intent."""
+        defaults = {
+            "type": "general",
+            "confidence": 0.5,
+        }
+        defaults.update(kwargs)
+        return cls.create(**defaults)

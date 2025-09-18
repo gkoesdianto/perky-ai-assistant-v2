@@ -5,7 +5,7 @@ from decimal import Decimal
 from typing import Dict
 
 from src.domain.value_objects.variant_info import VariantInfo
-from tests.unit.domain.factories import VariantInfoFactory
+from tests.factories import VariantInfoFactory
 
 
 class TestVariantInfoCreation:

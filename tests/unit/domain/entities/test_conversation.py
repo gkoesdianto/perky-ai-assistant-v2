@@ -10,7 +10,7 @@ from concurrent.futures import ThreadPoolExecutor
 from src.domain.entities.conversation import Conversation
 from src.domain.entities.message import Message
 from src.domain.entities.base import BaseEntity
-from tests.unit.domain.factories import ConversationFactory, MessageFactory
+from tests.factories import ConversationFactory, MessageFactory
 
 
 class TestConversationCreation:
