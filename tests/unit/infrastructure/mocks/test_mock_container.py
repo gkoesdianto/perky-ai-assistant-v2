@@ -4,7 +4,7 @@ import os
 import pytest
 from unittest.mock import patch
 
-from src.infrastructure.container import MockInfrastructureContainer
+from src.infrastructure.mocks.container.mock_container import MockInfrastructureContainer
 from src.infrastructure.mocks.mock_redis_client import MockRedisClient
 from src.infrastructure.mocks.mock_conversation_repository import MockConversationRepository
 from src.infrastructure.mocks.mock_product_repository import MockProductRepository

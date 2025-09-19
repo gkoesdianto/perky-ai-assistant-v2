@@ -3,7 +3,7 @@ Application-level dependency container.
 Integrates with infrastructure layer for dependency injection.
 """
 
-from src.infrastructure.container import MockInfrastructureContainer
+from src.infrastructure.mocks.container.mock_container import MockInfrastructureContainer
 
 
 class ApplicationContainer:
