@@ -14,6 +14,11 @@ from src.presentation.websocket.session_manager import SessionManager
 from src.presentation.websocket.message_queue import MessageQueue
 from src.presentation.websocket.rate_limiter import RateLimiter
 from src.presentation.websocket.types import MessageType, SystemEvent, WebSocketMessage
+from src.presentation.websocket.message_handler import (
+    MessageValidator,
+    MessageRateLimiter,
+)
+from src.presentation.websocket.reconnection import ReconnectionManager
 from src.core.config import settings
 
 logger = logging.getLogger(__name__)
@@ -29,6 +34,9 @@ class ChatWebSocket:
         session_manager: Optional[SessionManager] = None,
         message_queue: Optional[MessageQueue] = None,
         rate_limiter: Optional[RateLimiter] = None,
+        message_validator: Optional[MessageValidator] = None,
+        message_rate_limiter: Optional[MessageRateLimiter] = None,
+        reconnection_manager: Optional[ReconnectionManager] = None,
     ):
         """
         Initialize ChatWebSocket handler.
@@ -39,6 +47,9 @@ class ChatWebSocket:
             session_manager: Optional session manager (creates default if None)
             message_queue: Optional message queue (creates default if None)
             rate_limiter: Optional rate limiter (creates default if None)
+            message_validator: Optional message validator (creates default if None)
+            message_rate_limiter: Optional enhanced rate limiter (creates default if None)
+            reconnection_manager: Optional reconnection manager (creates default if None)
         """
         self.chat_orchestrator = chat_orchestrator
         self.connection_manager = connection_manager or ConnectionManager()
@@ -47,24 +58,46 @@ class ChatWebSocket:
         self.rate_limiter = rate_limiter or RateLimiter(
             max_per_minute=settings.MAX_MESSAGES_PER_MINUTE
         )
+        self.message_validator = message_validator or MessageValidator()
+        self.message_rate_limiter = message_rate_limiter or MessageRateLimiter(
+            max_messages_per_minute=settings.MAX_MESSAGES_PER_MINUTE,
+            max_messages_per_hour=500,
+            max_burst_size=5,
+        )
+        self.reconnection_manager = reconnection_manager or ReconnectionManager()
         self.last_activity: Dict[str, datetime] = {}
 
     async def websocket_endpoint(self, websocket: WebSocket, session_id: str):
         """
-        Main WebSocket endpoint handler.
+        Main WebSocket endpoint handler with reconnection support.
 
         Args:
             websocket: FastAPI WebSocket instance
             session_id: Unique session identifier
         """
-        # Generate unique connection ID
-        connection_id = f"{session_id}-{uuid.uuid4().hex[:8]}"
+        # Start reconnection manager if not already running
+        await self.reconnection_manager.start()
+
+        # Check for reconnection
+        session_state = await self.reconnection_manager.handle_reconnection(
+            session_id=session_id,
+            new_connection_id=f"{session_id}-{uuid.uuid4().hex[:8]}",
+        )
+
+        # Generate connection ID (use reconnection ID if available)
+        if session_state and session_state.connection_id:
+            connection_id = session_state.connection_id
+            is_reconnection = True
+        else:
+            connection_id = f"{session_id}-{uuid.uuid4().hex[:8]}"
+            is_reconnection = False
 
         # Extract metadata from headers
         metadata = {
             "user_agent": websocket.headers.get("user-agent", "unknown"),
             "origin": websocket.headers.get("origin", "unknown"),
             "accept_language": websocket.headers.get("accept-language", "en"),
+            "is_reconnection": is_reconnection,
         }
 
         # Establish connection
@@ -110,6 +143,16 @@ class ChatWebSocket:
             await self._send_error(connection_id, str(e))
 
         finally:
+            # Register disconnection for potential reconnection
+            self.reconnection_manager.register_disconnection(
+                session_id=session_id,
+                connection_id=connection_id,
+                state={
+                    "last_activity": self.last_activity.get(connection_id),
+                    "metadata": metadata,
+                },
+            )
+
             # Cleanup tasks
             if "heartbeat_task" in locals():
                 heartbeat_task.cancel()
@@ -120,9 +163,12 @@ class ChatWebSocket:
             await self.connection_manager.disconnect(connection_id)
             await self.session_manager.remove_connection(session_id, connection_id)
 
-            # Clean up activity tracker
+            # Clean up activity tracker and rate limiter
             if connection_id in self.last_activity:
                 del self.last_activity[connection_id]
+
+            # Reset rate limits for disconnected connection
+            self.message_rate_limiter.reset_connection(connection_id)
 
             # Notify other connections in session about disconnection
             await self.broadcast_to_session(
@@ -248,23 +294,29 @@ class ChatWebSocket:
         self, connection_id: str, session_id: str, message: WebSocketMessage
     ):
         """
-        Process user message.
+        Process user message with enhanced validation and rate limiting.
 
         Args:
             connection_id: Connection identifier
             session_id: Session identifier
             message: WebSocket message
         """
-        if not message.message:
-            await self._send_error(connection_id, "Pesan kosong")
+        # Validate message content
+        is_valid, error_msg = self.message_validator.validate_user_message(
+            message.message if message.message else ""
+        )
+        if not is_valid:
+            await self._send_error(connection_id, error_msg)
             return
 
-        # Check rate limit
-        if not await self.rate_limiter.is_allowed(session_id):
-            await self._send_error(
-                connection_id, "Terlalu banyak pesan. Silakan tunggu sebentar."
-            )
+        # Check enhanced rate limit
+        is_allowed, rate_error = self.message_rate_limiter.is_allowed(connection_id)
+        if not is_allowed:
+            await self._send_error(connection_id, rate_error)
             return
+
+        # Sanitize message for safe display
+        sanitized_message = self.message_validator.sanitize_message(message.message)
 
         # Send typing indicator
         typing_message = {
@@ -280,7 +332,7 @@ class ChatWebSocket:
         await self.broadcast_to_session(
             message={
                 "type": MessageType.USER_MESSAGE.value,
-                "message": message.message,
+                "message": sanitized_message,
                 "metadata": {"from_connection": connection_id[-8:]},
                 "timestamp": datetime.now().isoformat(),
             },
