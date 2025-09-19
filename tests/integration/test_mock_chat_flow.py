@@ -24,17 +24,9 @@ class TestMockChatFlow:
         container = MockInfrastructureContainer(use_mocks=True)
 
         # Initialize use cases with mock dependencies
-        # Create a wrapper for redis client to match expected interface
-        class RedisClientWrapper:
-            def __init__(self, mock_redis):
-                self.mock_redis = mock_redis
-
-            async def get_client(self):
-                return self.mock_redis
-
         start_session_use_case = StartChatSessionUseCaseImpl(
             session_repository=None,
-            redis_client=RedisClientWrapper(container.get_redis_client()),
+            redis_client=container.get_redis_client(),
         )
 
         process_message_use_case = ProcessUserMessageUseCaseImpl(
