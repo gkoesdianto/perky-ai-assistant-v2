@@ -1,33 +1,45 @@
-from typing import Dict, Any
+"""
+Application-level dependency container.
+Integrates with infrastructure layer for dependency injection.
+"""
+
+from src.infrastructure.mocks.container.mock_container import MockInfrastructureContainer
 
 
-class DIContainer:
-    """Simple dependency injection container"""
+class ApplicationContainer:
+    """Application-level dependency container."""
 
     def __init__(self):
-        self._services: Dict[str, Any] = {}
-        self._singletons: Dict[str, Any] = {}
+        # Initialize infrastructure container
+        self.infrastructure = MockInfrastructureContainer(use_mocks=True)
 
-    def register(self, name: str, factory, singleton: bool = False):
-        """Register a service factory"""
-        # Clear cached singleton if re-registering
-        if name in self._singletons:
-            del self._singletons[name]
-        self._services[name] = (factory, singleton)
+        # Wire up application services
+        self._setup_services()
 
-    def resolve(self, name: str):
-        """Resolve a service"""
-        if name not in self._services:
-            raise ValueError(f"Service {name} not registered")
+    def _setup_services(self):
+        """Setup application services with dependencies."""
+        # Note: ChatOrchestrator requires use case implementations
+        # which will be wired up in Phase 4 when implementing WebSocket integration.
+        # For now, we're providing direct access to the mock services
+        # so they can be used in integration tests.
+        pass
 
-        factory, is_singleton = self._services[name]
+    def get_redis_client(self):
+        """Get Redis client from infrastructure."""
+        return self.infrastructure.get_redis_client()
 
-        if is_singleton:
-            if name not in self._singletons:
-                self._singletons[name] = factory()
-            return self._singletons[name]
+    def get_conversation_repository(self):
+        """Get conversation repository from infrastructure."""
+        return self.infrastructure.get_conversation_repository()
 
-        return factory()
+    def get_product_repository(self):
+        """Get product repository from infrastructure."""
+        return self.infrastructure.get_product_repository()
 
+    def get_query_analyzer(self):
+        """Get query analyzer from infrastructure."""
+        return self.infrastructure.get_query_analyzer()
 
-container = DIContainer()
+    def get_ai_agent(self):
+        """Get AI agent from infrastructure."""
+        return self.infrastructure.get_ai_agent()

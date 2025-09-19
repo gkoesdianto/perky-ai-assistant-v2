@@ -1,238 +1,145 @@
-from unittest.mock import Mock
+"""Unit tests for ApplicationContainer."""
+
+import os
+from unittest.mock import patch
 
 import pytest
 
-from src.application.container import DIContainer
-
-
-class TestDIContainer:
-    def test_register_and_resolve_simple_service(self):
-        container = DIContainer()
-
-        def service_factory():
-            return {"type": "simple_service", "id": 1}
-
-        container.register("simple_service", service_factory)
-
-        result = container.resolve("simple_service")
-
-        assert result == {"type": "simple_service", "id": 1}
-
-    def test_resolve_unregistered_service_raises_error(self):
-        container = DIContainer()
-
-        with pytest.raises(ValueError) as exc_info:
-            container.resolve("nonexistent_service")
-
-        assert "Service nonexistent_service not registered" in str(exc_info.value)
-
-    def test_singleton_returns_same_instance(self):
-        container = DIContainer()
-        counter = {"calls": 0}
-
-        def expensive_factory():
-            counter["calls"] += 1
-            return {"instance_id": counter["calls"]}
-
-        container.register("singleton_service", expensive_factory, singleton=True)
-
-        first_instance = container.resolve("singleton_service")
-        second_instance = container.resolve("singleton_service")
-        third_instance = container.resolve("singleton_service")
-
-        assert first_instance is second_instance
-        assert second_instance is third_instance
-        assert counter["calls"] == 1
-        assert first_instance["instance_id"] == 1
-
-    def test_non_singleton_creates_new_instances(self):
-        container = DIContainer()
-        counter = {"calls": 0}
-
-        def factory():
-            counter["calls"] += 1
-            return {"instance_id": counter["calls"]}
-
-        container.register("regular_service", factory, singleton=False)
-
-        first_instance = container.resolve("regular_service")
-        second_instance = container.resolve("regular_service")
-        third_instance = container.resolve("regular_service")
-
-        assert first_instance is not second_instance
-        assert second_instance is not third_instance
-        assert counter["calls"] == 3
-        assert first_instance["instance_id"] == 1
-        assert second_instance["instance_id"] == 2
-        assert third_instance["instance_id"] == 3
-
-    def test_factory_with_dependencies(self):
-        container = DIContainer()
-
-        def database_factory():
-            return {"type": "database", "connected": True}
-
-        def repository_factory():
-            db = container.resolve("database")
-            return {"type": "repository", "database": db}
-
-        def service_factory():
-            repo = container.resolve("repository")
-            return {"type": "service", "repository": repo}
-
-        container.register("database", database_factory, singleton=True)
-        container.register("repository", repository_factory, singleton=True)
-        container.register("service", service_factory)
-
-        service = container.resolve("service")
-
-        assert service["type"] == "service"
-        assert service["repository"]["type"] == "repository"
-        assert service["repository"]["database"]["type"] == "database"
-        assert service["repository"]["database"]["connected"] is True
-
-    def test_overwrite_existing_registration(self):
-        container = DIContainer()
-
-        def first_factory():
-            return {"version": 1}
-
-        def second_factory():
-            return {"version": 2}
-
-        container.register("service", first_factory)
-        first_result = container.resolve("service")
-        assert first_result["version"] == 1
-
-        container.register("service", second_factory)
-        second_result = container.resolve("service")
-        assert second_result["version"] == 2
-
-    def test_singleton_overwrite_clears_cached_instance(self):
-        container = DIContainer()
-        counter = {"v1_calls": 0, "v2_calls": 0}
-
-        def factory_v1():
-            counter["v1_calls"] += 1
-            return {"version": 1, "calls": counter["v1_calls"]}
-
-        def factory_v2():
-            counter["v2_calls"] += 1
-            return {"version": 2, "calls": counter["v2_calls"]}
-
-        container.register("singleton", factory_v1, singleton=True)
-        first_instance = container.resolve("singleton")
-        assert first_instance["version"] == 1
-        assert counter["v1_calls"] == 1
-
-        container.register("singleton", factory_v2, singleton=True)
-        second_instance = container.resolve("singleton")
-        third_instance = container.resolve("singleton")
-
-        assert second_instance["version"] == 2
-        assert second_instance is third_instance
-        assert counter["v2_calls"] == 1
-
-    def test_lambda_factories(self):
-        container = DIContainer()
-
-        container.register("config", lambda: {"debug": True})
-        container.register("logger", lambda: Mock(spec=["log", "error"]))
-
-        config = container.resolve("config")
-        logger = container.resolve("logger")
-
-        assert config == {"debug": True}
-        assert hasattr(logger, "log")
-        assert hasattr(logger, "error")
-
-    def test_factory_with_exceptions(self):
-        container = DIContainer()
-
-        def failing_factory():
-            raise RuntimeError("Factory initialization failed")
-
-        container.register("failing_service", failing_factory)
-
-        with pytest.raises(RuntimeError) as exc_info:
-            container.resolve("failing_service")
-
-        assert "Factory initialization failed" in str(exc_info.value)
-
-    def test_multiple_containers_are_independent(self):
-        container1 = DIContainer()
-        container2 = DIContainer()
-
-        container1.register("service", lambda: {"container": 1})
-        container2.register("service", lambda: {"container": 2})
-
-        result1 = container1.resolve("service")
-        result2 = container2.resolve("service")
-
-        assert result1["container"] == 1
-        assert result2["container"] == 2
-
-    def test_complex_object_factories(self):
-        container = DIContainer()
-
-        class DatabaseConnection:
-            def __init__(self, host, port):
-                self.host = host
-                self.port = port
-                self.connected = True
-
-        class UserRepository:
-            def __init__(self, db_connection):
-                self.db = db_connection
-
-            def get_user(self, user_id):
-                return {"id": user_id, "name": f"User {user_id}"}
-
-        container.register(
-            "db_connection",
-            lambda: DatabaseConnection("localhost", 5432),
-            singleton=True,
-        )
-
-        container.register(
-            "user_repository",
-            lambda: UserRepository(container.resolve("db_connection")),
-            singleton=True,
-        )
-
-        repo = container.resolve("user_repository")
-        user = repo.get_user(123)
-
-        assert repo.db.host == "localhost"
-        assert repo.db.port == 5432
-        assert repo.db.connected is True
-        assert user == {"id": 123, "name": "User 123"}
-
-    def test_empty_container_has_no_services(self):
-        container = DIContainer()
-
-        assert container._services == {}
-        assert container._singletons == {}
-
-    def test_factory_called_with_no_arguments(self):
-        container = DIContainer()
-        mock_factory = Mock(return_value={"created": True})
-
-        container.register("mock_service", mock_factory)
-        result = container.resolve("mock_service")
-
-        mock_factory.assert_called_once_with()
-        assert result == {"created": True}
-
-    def test_singleton_lazy_initialization(self):
-        container = DIContainer()
-        mock_factory = Mock(return_value={"lazy": True})
-
-        container.register("lazy_singleton", mock_factory, singleton=True)
-
-        mock_factory.assert_not_called()
-
-        result = container.resolve("lazy_singleton")
-
-        mock_factory.assert_called_once()
-        assert result == {"lazy": True}
+from src.application.container import ApplicationContainer
+from src.infrastructure.mocks.mock_redis_client import MockRedisClient
+from src.infrastructure.mocks.mock_conversation_repository import MockConversationRepository
+from src.infrastructure.mocks.mock_product_repository import MockProductRepository
+from src.infrastructure.mocks.mock_query_analyzer import MockQueryAnalyzer
+from src.infrastructure.mocks.mock_ai_agent import MockAIAgent
+
+
+class TestApplicationContainer:
+    """Test suite for ApplicationContainer."""
+
+    def test_application_container_initialization(self):
+        """Test that application container initializes with mock infrastructure."""
+        container = ApplicationContainer()
+
+        assert container.infrastructure is not None
+        assert container.infrastructure.mode == "mock"
+        assert container.infrastructure.use_mocks is True
+
+    def test_get_redis_client(self):
+        """Test that get_redis_client returns MockRedisClient."""
+        container = ApplicationContainer()
+        redis_client = container.get_redis_client()
+
+        assert redis_client is not None
+        assert isinstance(redis_client, MockRedisClient)
+
+    def test_get_conversation_repository(self):
+        """Test that get_conversation_repository returns MockConversationRepository."""
+        container = ApplicationContainer()
+        repo = container.get_conversation_repository()
+
+        assert repo is not None
+        assert isinstance(repo, MockConversationRepository)
+
+    def test_get_product_repository(self):
+        """Test that get_product_repository returns MockProductRepository."""
+        container = ApplicationContainer()
+        repo = container.get_product_repository()
+
+        assert repo is not None
+        assert isinstance(repo, MockProductRepository)
+
+    def test_get_query_analyzer(self):
+        """Test that get_query_analyzer returns MockQueryAnalyzer."""
+        container = ApplicationContainer()
+        analyzer = container.get_query_analyzer()
+
+        assert analyzer is not None
+        assert isinstance(analyzer, MockQueryAnalyzer)
+
+    def test_get_ai_agent(self):
+        """Test that get_ai_agent returns MockAIAgent."""
+        container = ApplicationContainer()
+        agent = container.get_ai_agent()
+
+        assert agent is not None
+        assert isinstance(agent, MockAIAgent)
+
+    def test_services_are_singletons(self):
+        """Test that services return the same instance on multiple calls."""
+        container = ApplicationContainer()
+
+        # Get services twice and verify they're the same instance
+        redis1 = container.get_redis_client()
+        redis2 = container.get_redis_client()
+        assert redis1 is redis2
+
+        conv_repo1 = container.get_conversation_repository()
+        conv_repo2 = container.get_conversation_repository()
+        assert conv_repo1 is conv_repo2
+
+        product_repo1 = container.get_product_repository()
+        product_repo2 = container.get_product_repository()
+        assert product_repo1 is product_repo2
+
+        analyzer1 = container.get_query_analyzer()
+        analyzer2 = container.get_query_analyzer()
+        assert analyzer1 is analyzer2
+
+        agent1 = container.get_ai_agent()
+        agent2 = container.get_ai_agent()
+        assert agent1 is agent2
+
+    @patch.dict(os.environ, {"USE_MOCK_MODE": "true"})
+    def test_mock_mode_from_environment(self):
+        """Test that container respects USE_MOCK_MODE environment variable."""
+        container = ApplicationContainer()
+
+        assert container.infrastructure.use_mocks is True
+        assert container.infrastructure.mode == "mock"
+
+    @patch.dict(os.environ, {
+        "MOCK_RESPONSE_DELAY_MS": "100",
+        "MOCK_ERROR_RATE": "0.1",
+        "MOCK_DATA_SEED": "123"
+    })
+    def test_mock_configuration_propagation(self):
+        """Test that mock configuration is properly propagated from environment."""
+        container = ApplicationContainer()
+        config = container.infrastructure.get_configuration()
+
+        assert config["mock_response_delay_ms"] == 100
+        assert config["mock_error_rate"] == 0.1
+        assert config["mock_data_seed"] == 123
+
+    def test_multiple_containers_share_same_infrastructure_config(self):
+        """Test that multiple container instances can coexist."""
+        container1 = ApplicationContainer()
+        container2 = ApplicationContainer()
+
+        # Each container has its own infrastructure instance
+        assert container1.infrastructure is not container2.infrastructure
+
+        # But they have the same configuration
+        config1 = container1.infrastructure.get_configuration()
+        config2 = container2.infrastructure.get_configuration()
+
+        assert config1["mode"] == config2["mode"]
+        assert config1["use_mocks"] == config2["use_mocks"]
+
+    def test_all_services_available(self):
+        """Test that all expected services are available from the container."""
+        container = ApplicationContainer()
+
+        # List of expected service getter methods
+        expected_services = [
+            "get_redis_client",
+            "get_conversation_repository",
+            "get_product_repository",
+            "get_query_analyzer",
+            "get_ai_agent",
+        ]
+
+        for service_getter in expected_services:
+            assert hasattr(container, service_getter)
+            service = getattr(container, service_getter)()
+            assert service is not None

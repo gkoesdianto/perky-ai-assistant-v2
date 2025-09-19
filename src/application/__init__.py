@@ -1,3 +1,3 @@
-from .container import DIContainer, container
+from .container import ApplicationContainer
 
-__all__ = ["DIContainer", "container"]
+__all__ = ["ApplicationContainer"]
