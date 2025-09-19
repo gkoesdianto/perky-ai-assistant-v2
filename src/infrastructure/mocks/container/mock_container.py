@@ -10,6 +10,7 @@ from src.infrastructure.mocks.mock_redis_client import MockRedisClient
 from src.infrastructure.mocks.mock_conversation_repository import (
     MockConversationRepository,
 )
+from src.infrastructure.mocks.mock_session_repository import MockSessionRepository
 from src.infrastructure.mocks.mock_product_repository import MockProductRepository
 from src.infrastructure.mocks.mock_query_analyzer import MockQueryAnalyzer
 from src.infrastructure.mocks.mock_ai_agent import MockAIAgent
@@ -58,6 +59,7 @@ class MockInfrastructureContainer:
         """Register all mock implementations."""
         # Initialize mock components
         self.redis_client = MockRedisClient()
+        self.session_repo = MockSessionRepository()
         self.conversation_repo = MockConversationRepository()
         self.product_repo = MockProductRepository()
         self.query_analyzer = MockQueryAnalyzer()
@@ -91,6 +93,15 @@ class MockInfrastructureContainer:
             Redis client (mock or real based on configuration)
         """
         return self.redis_client
+
+    def get_session_repository(self):
+        """
+        Get session repository instance.
+
+        Returns:
+            Session repository (mock or real based on configuration)
+        """
+        return self.session_repo
 
     def get_conversation_repository(self):
         """
