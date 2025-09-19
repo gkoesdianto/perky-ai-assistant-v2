@@ -2,15 +2,18 @@
 
 ## Executive Summary
 
-This document provides a systematic, deep-dive workflow for implementing WebSocket
-integration in the Steel Chat MVP system. The implementation follows Domain-Driven
-Design (DDD) principles and integrates real-time bidirectional communication
-capabilities into the existing application architecture.
+WebSocket integration for Steel Chat MVP with security, clean architecture, and resilience patterns.
 
 **Timeline**: Day 3 of MVP Development (8-9 hours)
-**Complexity**: Moderate to High
-**Risk Level**: Medium
-**Critical Path**: Yes - Blocks user interaction capabilities
+**Complexity**: Moderate
+**Risk Level**: Low (with security patterns)
+**Critical Path**: Yes
+
+**MVP Focus**:
+- JWT authentication
+- Separated responsibilities (SRP)
+- Async message processing
+- Rate limiting & circuit breaker
 
 ## Table of Contents
 
@@ -53,21 +56,25 @@ capabilities into the existing application architecture.
 ### Technical Dependencies
 
 ```python
-# Already configured in requirements/base.txt
-fastapi==0.115.5          # WebSocket support included
-uvicorn[standard]==0.32.1  # ASGI server with WebSocket
-redis==5.2.0              # Session management
-pydantic==2.10.3          # Data validation
+# requirements/base.txt
+fastapi==0.115.5
+uvicorn[standard]==0.32.1
+redis==5.2.0
+pydantic==2.10.3
+python-jose[cryptography]==3.3.0  # JWT authentication
 ```
 
 ### Environment Requirements
 
 ```bash
-# .env configuration
-USE_MOCK_MODE=true        # Use mock infrastructure
-REDIS_URL=redis://localhost:6379/0  # Optional for MVP
-SESSION_TTL_SECONDS=3600  # 1-hour sessions
-WEBSOCKET_HEARTBEAT_INTERVAL=30  # 30-second heartbeat
+# .env
+USE_MOCK_MODE=true
+REDIS_URL=redis://localhost:6379/0
+SESSION_TTL_SECONDS=3600
+WEBSOCKET_HEARTBEAT_INTERVAL=30
+SECRET_KEY=your-secret-key-for-jwt
+MAX_MESSAGES_PER_MINUTE=10
+CIRCUIT_BREAKER_THRESHOLD=3
 ```
 
 ---
@@ -78,14 +85,16 @@ WEBSOCKET_HEARTBEAT_INTERVAL=30  # 30-second heartbeat
 
 ```text
 graph LR
-    Client[HTML Client] -->|WebSocket| WS[WebSocket Endpoint]
-    WS --> CM[Connection Manager]
-    CM --> CO[Chat Orchestrator]
+    Client[HTML Client] -->|WebSocket + JWT| WS[WebSocket Endpoint]
+    WS --> Auth[Auth Validator]
+    Auth --> CM[Connection Manager]
+    CM --> SM[Session Manager]
+    SM --> MQ[Message Queue]
+    MQ --> CO[Chat Orchestrator]
     CO --> UC[Use Cases]
-    UC --> AI[AI Agent]
-    AI --> PS[Product Service]
+    UC --> CB[Circuit Breaker]
+    CB --> AI[AI Agent]
     UC --> CR[Conversation Repo]
-    CR --> Redis[(Redis/Mock)]
 ```
 
 ### Layer Responsibilities
@@ -115,236 +124,244 @@ graph LR
 
 ## Implementation Stages
 
-### Stage 1: Foundation Setup (2 hours)
+### Stage 1: Foundation with Security (2 hours)
 
-#### 1.1 Package Structure Creation
-
-**Tasks**:
+#### 1.1 Package Structure
 
 ```bash
-# Create WebSocket package structure
 mkdir -p src/presentation/websocket
 touch src/presentation/websocket/__init__.py
 touch src/presentation/websocket/connection_manager.py
+touch src/presentation/websocket/session_manager.py
 touch src/presentation/websocket/chat_ws.py
-touch src/presentation/websocket/message_handler.py
+touch src/presentation/websocket/auth.py
+touch src/presentation/websocket/rate_limiter.py
+touch src/presentation/websocket/circuit_breaker.py
 touch src/presentation/websocket/types.py
 ```
 
-**Deliverables**:
-- [ ] WebSocket package initialized
-- [ ] Base module structure created
-- [ ] Type definitions established
-
-#### 1.2 WebSocket Types Definition
+#### 1.2 Authentication Setup
 
 ```python
-# src/presentation/websocket/types.py
+# src/presentation/websocket/auth.py
+import jwt
+from datetime import datetime, timedelta
+from typing import Optional
+from src.core.config import settings
+
+def create_websocket_token(session_id: str) -> str:
+    payload = {
+        "session_id": session_id,
+        "exp": datetime.utcnow() + timedelta(hours=1)
+    }
+    return jwt.encode(payload, settings.SECRET_KEY, algorithm="HS256")
+
+def validate_websocket_token(token: str) -> Optional[str]:
+    try:
+        payload = jwt.decode(token, settings.SECRET_KEY, algorithms=["HS256"])
+        return payload.get("session_id")
+    except:
+        return None
+```
+
+#### 1.3 Rate Limiter
+
+```python
+# src/presentation/websocket/rate_limiter.py
+from datetime import datetime, timedelta
+from typing import Dict, List
+
+class RateLimiter:
+    def __init__(self, max_per_minute: int = 10):
+        self.max_per_minute = max_per_minute
+        self.requests: Dict[str, List[datetime]] = {}
+
+    async def is_allowed(self, session_id: str) -> bool:
+        now = datetime.now()
+        if session_id not in self.requests:
+            self.requests[session_id] = []
+
+        self.requests[session_id] = [
+            t for t in self.requests[session_id]
+            if now - t < timedelta(minutes=1)
+        ]
+
+        if len(self.requests[session_id]) >= self.max_per_minute:
+            return False
+
+        self.requests[session_id].append(now)
+        return True
+```
+
+#### 1.4 Circuit Breaker
+
+```python
+# src/presentation/websocket/circuit_breaker.py
+from datetime import datetime, timedelta
 from enum import Enum
-from typing import Literal, Optional, Dict, Any
-from pydantic import BaseModel
 
-class MessageType(str, Enum):
-    USER_MESSAGE = "user_message"
-    AI_RESPONSE = "ai_response"
-    SYSTEM = "system"
-    HEARTBEAT = "heartbeat"
-    PING = "ping"
-    PONG = "pong"
-    ERROR = "error"
+class CircuitState(Enum):
+    CLOSED = "closed"
+    OPEN = "open"
+    HALF_OPEN = "half_open"
 
-class SystemEvent(str, Enum):
-    CONNECTED = "connected"
-    DISCONNECTED = "disconnected"
-    TYPING = "typing"
-    ERROR = "error"
-    SESSION_EXPIRED = "session_expired"
+class CircuitBreaker:
+    def __init__(self, failure_threshold: int = 3, recovery_timeout: int = 60):
+        self.failure_threshold = failure_threshold
+        self.recovery_timeout = recovery_timeout
+        self.failure_count = 0
+        self.last_failure_time = None
+        self.state = CircuitState.CLOSED
 
-class WebSocketMessage(BaseModel):
-    type: MessageType
-    message: Optional[str] = None
-    metadata: Optional[Dict[str, Any]] = None
-    event: Optional[SystemEvent] = None
-    timestamp: Optional[str] = None
+    async def call(self, func, *args, **kwargs):
+        if self.state == CircuitState.OPEN:
+            if self._should_attempt_reset():
+                self.state = CircuitState.HALF_OPEN
+            else:
+                raise Exception("Circuit breaker is OPEN")
+
+        try:
+            result = await func(*args, **kwargs)
+            self._on_success()
+            return result
+        except Exception as e:
+            self._on_failure()
+            raise e
+
+    def _on_success(self):
+        self.failure_count = 0
+        self.state = CircuitState.CLOSED
+
+    def _on_failure(self):
+        self.failure_count += 1
+        self.last_failure_time = datetime.now()
+        if self.failure_count >= self.failure_threshold:
+            self.state = CircuitState.OPEN
+
+    def _should_attempt_reset(self) -> bool:
+        return (
+            self.last_failure_time and
+            datetime.now() - self.last_failure_time > timedelta(seconds=self.recovery_timeout)
+        )
 ```
-
-#### 1.3 Configuration Updates
-
-```python
-# src/core/config.py additions
-class WebSocketSettings:
-    heartbeat_interval: int = 30
-    max_connections_per_session: int = 5
-    connection_timeout: int = 300
-    message_size_limit: int = 65536
-    reconnection_window: int = 60
-```
-
-**Validation Checkpoint 1.1**:
-- [ ] All files created successfully
-- [ ] Type system comprehensive
-- [ ] Configuration integrated
 
 ---
 
-### Stage 2: Core Implementation (3 hours)
+### Stage 2: Core Implementation with Clean Architecture (3 hours)
 
-#### 2.1 Connection Manager Implementation
+#### 2.1 Separated Managers (SRP)
 
 ```python
 # src/presentation/websocket/connection_manager.py
-
-import asyncio
-from typing import Dict, Set, Optional
+from typing import Dict
 from fastapi import WebSocket
-import json
 import logging
-from datetime import datetime, timedelta
 
 logger = logging.getLogger(__name__)
 
 class ConnectionManager:
-    """Manages WebSocket connections with session grouping"""
+    """Manages WebSocket connections only"""
 
     def __init__(self):
-        # Primary connection storage
         self.active_connections: Dict[str, WebSocket] = {}
-        # Session grouping for broadcasting
-        self.session_connections: Dict[str, Set[str]] = {}
-        # Connection metadata
-        self.connection_metadata: Dict[str, Dict] = {}
-        # Connection health tracking
-        self.last_activity: Dict[str, datetime] = {}
 
-    async def connect(
-        self,
-        websocket: WebSocket,
-        connection_id: str,
-        session_id: str,
-        metadata: Optional[Dict] = None
-    ) -> bool:
-        """Accept and register new connection"""
+    async def connect(self, websocket: WebSocket, connection_id: str) -> bool:
         try:
             await websocket.accept()
-
-            # Store connection
             self.active_connections[connection_id] = websocket
-
-            # Group by session
-            if session_id not in self.session_connections:
-                self.session_connections[session_id] = set()
-            self.session_connections[session_id].add(connection_id)
-
-            # Store metadata
-            self.connection_metadata[connection_id] = {
-                "session_id": session_id,
-                "connected_at": datetime.now(),
-                "user_agent": metadata.get("user_agent") if metadata else None,
-                **(metadata or {})
-            }
-
-            # Initialize activity tracking
-            self.last_activity[connection_id] = datetime.now()
-
-            logger.info(
-                f"Client connected: {connection_id} for session {session_id}"
-            )
+            logger.info(f"Client connected: {connection_id}")
             return True
-
         except Exception as e:
-            logger.error(f"Connection failed for {connection_id}: {e}")
+            logger.error(f"Connection failed: {e}")
             return False
 
     def disconnect(self, connection_id: str):
-        """Remove connection and cleanup"""
         if connection_id in self.active_connections:
-            # Remove from active connections
             del self.active_connections[connection_id]
-
-            # Remove from session grouping
-            metadata = self.connection_metadata.get(connection_id, {})
-            session_id = metadata.get("session_id")
-
-            if session_id and session_id in self.session_connections:
-                self.session_connections[session_id].discard(connection_id)
-
-                # Clean up empty session groups
-                if not self.session_connections[session_id]:
-                    del self.session_connections[session_id]
-
-            # Clean up metadata
-            if connection_id in self.connection_metadata:
-                del self.connection_metadata[connection_id]
-
-            # Clean up activity tracking
-            if connection_id in self.last_activity:
-                del self.last_activity[connection_id]
-
             logger.info(f"Client disconnected: {connection_id}")
 
-    async def send_personal_message(
-        self,
-        message: dict,
-        connection_id: str
-    ) -> bool:
-        """Send message to specific client"""
+    async def send_message(self, connection_id: str, message: dict
+) -> bool:
         if connection_id in self.active_connections:
             try:
-                websocket = self.active_connections[connection_id]
-                await websocket.send_json(message)
-                self.last_activity[connection_id] = datetime.now()
+                await self.active_connections[connection_id].send_json(message)
                 return True
             except Exception as e:
-                logger.error(
-                    f"Failed to send message to {connection_id}: {e}"
-                )
+                logger.error(f"Failed to send message: {e}")
                 self.disconnect(connection_id)
                 return False
         return False
-
-    async def broadcast_to_session(
-        self,
-        message: dict,
-        session_id: str,
-        exclude_connection: Optional[str] = None
-    ):
-        """Broadcast message to all connections in a session"""
-        if session_id in self.session_connections:
-            disconnected = []
-
-            for connection_id in self.session_connections[session_id]:
-                if connection_id == exclude_connection:
-                    continue
-
-                if not await self.send_personal_message(message, connection_id):
-                    disconnected.append(connection_id)
-
-            # Clean up failed connections
-            for conn_id in disconnected:
-                self.disconnect(conn_id)
-
-    def get_connection_count(self, session_id: Optional[str] = None) -> int:
-        """Get active connection count"""
-        if session_id:
-            return len(self.session_connections.get(session_id, set()))
-        return len(self.active_connections)
-
-    async def check_connection_health(self):
-        """Periodic health check for connections"""
-        now = datetime.now()
-        timeout = timedelta(seconds=90)  # 3x heartbeat interval
-
-        stale_connections = []
-        for conn_id, last_active in self.last_activity.items():
-            if now - last_active > timeout:
-                stale_connections.append(conn_id)
-
-        for conn_id in stale_connections:
-            logger.warning(f"Removing stale connection: {conn_id}")
-            self.disconnect(conn_id)
 ```
 
-#### 2.2 Chat WebSocket Endpoint
+```python
+# src/presentation/websocket/session_manager.py
+from typing import Dict, Set, Optional
+
+class SessionManager:
+    """Manages session grouping for WebSocket connections"""
+
+    def __init__(self):
+        self.session_connections: Dict[str, Set[str]] = {}
+
+    def add_connection(self, session_id: str, connection_id: str):
+        if session_id not in self.session_connections:
+            self.session_connections[session_id] = set()
+        self.session_connections[session_id].add(connection_id)
+
+    def remove_connection(self, session_id: str, connection_id: str):
+        if session_id in self.session_connections:
+            self.session_connections[session_id].discard(connection_id)
+            if not self.session_connections[session_id]:
+                del self.session_connections[session_id]
+
+    def get_session_connections(self, session_id: str) -> Set[str]:
+        return self.session_connections.get(session_id, set())
+
+    def get_connection_count(self, session_id: str) -> int:
+        return len(self.session_connections.get(session_id, set()))
+```
+
+#### 2.2 Message Queue for Async Processing
+
+```python
+# src/presentation/websocket/message_queue.py
+import asyncio
+from typing import Dict, Any
+import logging
+
+logger = logging.getLogger(__name__)
+
+class MessageQueue:
+    """Async message queue to prevent blocking"""
+
+    def __init__(self):
+        self.queue = asyncio.Queue()
+        self.worker_task = None
+
+    async def start_worker(self, process_func):
+        """Start the queue worker"""
+        self.worker_task = asyncio.create_task(self._process_queue(process_func))
+
+    async def _process_queue(self, process_func):
+        """Process messages from queue"""
+        while True:
+            try:
+                message_data = await self.queue.get()
+                await process_func(message_data)
+            except Exception as e:
+                logger.error(f"Queue processing error: {e}")
+
+    async def add_message(self, message_data: Dict[str, Any]):
+        """Add message to queue"""
+        await self.queue.put(message_data)
+
+    async def stop_worker(self):
+        """Stop the queue worker"""
+        if self.worker_task:
+            self.worker_task.cancel()
+```
+
+#### 2.3 Chat WebSocket Endpoint with Security
 
 ```python
 # src/presentation/websocket/chat_ws.py
@@ -2232,19 +2249,20 @@ Server -> Client:
 
 | Issue | Possible Cause | Solution |
 |-------|---------------|----------|
-| Connection fails | Server not running | Check uvicorn process |
-| Messages not sent | Connection dropped | Check connection status |
-| High latency | Network issues | Check network, reduce message size |
-| Memory leak | Connections not cleaned | Review cleanup code |
-| Browser incompatible | Old browser | Update browser, use polyfill |
+| Connection fails | Invalid JWT token | Verify token generation and validation |
+| Auth rejected | Expired token | Refresh token before expiry |
+| Rate limit hit | Too many requests | Implement client-side throttling |
+| Circuit open | Service failures | Check AI agent availability |
+| Messages queued | Async processing delay | Monitor queue size and processing time |
+| Connection drops | No heartbeat | Ensure heartbeat implementation |
 
-### C. Future Enhancements
+### C. Future Enhancements (Nice-to-Have, Not for MVP)
 
-1. **Production Readiness**
+1. **Production Scaling**
    - Redis Pub/Sub for horizontal scaling
-   - JWT authentication for WebSocket
    - Connection pooling optimization
    - Prometheus metrics integration
+   - Distributed rate limiting
 
 2. **Enhanced Features**
    - File upload support
@@ -2252,6 +2270,7 @@ Server -> Client:
    - Read receipts
    - Presence indicators
    - Message history pagination
+   - Multi-language support
 
 3. **Client Libraries**
    - JavaScript/TypeScript SDK
@@ -2269,26 +2288,22 @@ Server -> Client:
 
 ## Summary
 
-This comprehensive workflow provides a systematic approach to implementing WebSocket
-integration for the Steel Chat MVP. The implementation follows a staged approach with
-clear deliverables, extensive testing, and robust error handling. The workflow ensures
-that the WebSocket layer integrates seamlessly with the existing DDD architecture
-while providing a reliable real-time communication channel for the chat application.
+This MVP-focused workflow implements WebSocket integration with essential security and
+stability features. The implementation prioritizes the "Must Fix for MVP" items:
 
-**Key Success Factors**:
-- Staged implementation with validation checkpoints
-- Comprehensive testing at all levels
-- Robust error handling and recovery
-- Clear separation of concerns
-- Production-ready considerations
+**MVP Implementations**:
+- JWT authentication for secure connections
+- Clean architecture with separated responsibilities (SRP)
+- Async message queue to prevent blocking
+- Rate limiting to prevent abuse
+- Circuit breaker for service resilience
 
-**Timeline**: 8-9 hours total
-- Stage 1: 2 hours (Foundation)
-- Stage 2: 3 hours (Core Implementation)
-- Stage 3: 2 hours (Enhancements)
-- Stage 4: 2 hours (Testing & Validation)
+**Timeline**: 6-7 hours total (MVP scope)
+- Stage 1: 2 hours (Security Foundation)
+- Stage 2: 3 hours (Core Implementation with Clean Architecture)
+- Stage 3: 1-2 hours (Testing & Validation)
 
-**Risk Level**: Medium (mitigated through comprehensive testing and error handling)
+**Risk Level**: Low (mitigated through authentication, rate limiting, and circuit breaker)
 
 **Next Steps**: After successful implementation, proceed to Phase 5: Integration &
 Testing to complete the MVP development cycle.
