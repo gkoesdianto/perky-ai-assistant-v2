@@ -4,12 +4,14 @@ Provides hardcoded Indonesian steel product catalog without external dependencie
 """
 
 import asyncio
+import os
 from decimal import Decimal
 from typing import Dict, List, Optional
 
 from src.domain.repositories.product_repository import ProductRepository
 from src.domain.value_objects import ProductInfo, VariantInfo
 from src.domain.value_objects.product_with_variants_info import ProductWithVariantsInfo
+from src.infrastructure.mocks.mock_error_simulator import MockErrorSimulator
 
 
 class MockProductRepository(ProductRepository):
@@ -23,6 +25,11 @@ class MockProductRepository(ProductRepository):
         """Initialize with hardcoded Indonesian steel product catalog."""
         self._lock = asyncio.Lock()  # Thread safety for concurrent access
         self.products = self._create_mock_products()
+
+        # Initialize error simulator from environment
+        error_rate = float(os.getenv("MOCK_ERROR_RATE", "0.0"))
+        delay_ms = int(os.getenv("MOCK_RESPONSE_DELAY_MS", "0"))
+        self.error_simulator = MockErrorSimulator(error_rate, delay_ms)
 
         # Indonesian terminology mapping for search
         self.terminology_map = {
@@ -915,6 +922,10 @@ class MockProductRepository(ProductRepository):
         Search products by name or description with Indonesian terminology support.
         Returns top 5 relevant products matching the query.
         """
+        # Simulate potential errors and delays
+        await self.error_simulator.maybe_delay()
+        await self.error_simulator.maybe_fail("search_products")
+
         async with self._lock:
             query_lower = query.lower()
             results = []
