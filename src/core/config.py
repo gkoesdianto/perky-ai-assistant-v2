@@ -19,6 +19,20 @@ class Settings(BaseSettings):
     POSTGRES_DB: str
     DATABASE_URL: Optional[PostgresDsn] = None
 
+    @field_validator("WEBSOCKET_HEARTBEAT_INTERVAL", mode="before")
+    @classmethod
+    def set_heartbeat_interval(cls, v: Optional[int], values) -> int:
+        if v is not None:
+            return v
+        return values.data.get("WS_HEARTBEAT_INTERVAL", 30)
+
+    @field_validator("MAX_MESSAGES_PER_MINUTE", mode="before")
+    @classmethod
+    def set_message_rate_limit(cls, v: Optional[int], values) -> int:
+        if v is not None:
+            return v
+        return values.data.get("WS_MESSAGE_RATE_LIMIT", 10)
+
     @field_validator("DATABASE_URL", mode="before")
     @classmethod
     def assemble_db_connection(cls, v: Optional[str], values) -> str:
@@ -60,6 +74,8 @@ class Settings(BaseSettings):
     WS_HEARTBEAT_INTERVAL: int
     WS_MAX_CONNECTIONS: int
     WS_MESSAGE_RATE_LIMIT: int
+    WEBSOCKET_HEARTBEAT_INTERVAL: Optional[int] = None  # Alias for WS_HEARTBEAT_INTERVAL
+    MAX_MESSAGES_PER_MINUTE: Optional[int] = None  # Alias for WS_MESSAGE_RATE_LIMIT
 
     # Security
     SECRET_KEY: str
