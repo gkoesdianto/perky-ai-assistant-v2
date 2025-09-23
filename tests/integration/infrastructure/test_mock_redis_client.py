@@ -1,11 +1,12 @@
 """
 Integration tests for MockRedisClient.
-Tests the MockRedisClient implementation to ensure it properly simulates Redis operations.
+Tests the MockRedisClient implementation to ensure it simulates Redis operations.
 """
 
 import asyncio
 import json
 from datetime import datetime
+
 import pytest
 
 from src.infrastructure.mocks.mock_redis_client import MockRedisClient
