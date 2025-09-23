@@ -16,22 +16,22 @@ class TestStartChatSessionUseCaseImpl:
     """
 
     @pytest.fixture
-    def use_case(self, mock_redis_adapter):
+    def use_case(self, mock_redis_client):
         """
         Create a StartChatSessionUseCaseImpl instance with mocked dependencies.
 
         Args:
-            mock_redis_adapter: Shared fixture from conftest.py
+            mock_redis_client: Shared fixture from conftest.py
 
         Returns:
             StartChatSessionUseCaseImpl: The use case instance for testing
         """
         return StartChatSessionUseCaseImpl(
-            session_repository=None, redis_client=mock_redis_adapter  # Not used in MVP
+            session_repository=None, redis_client=mock_redis_client  # Not used in MVP
         )
 
     @pytest.mark.asyncio
-    async def test_execute_with_existing_session(self, use_case, mock_redis_adapter):
+    async def test_execute_with_existing_session(self, use_case, mock_redis_client):
         """Test that existing session is returned from Redis."""
         # Arrange
         session_id = "test-session-123"
@@ -48,8 +48,7 @@ class TestStartChatSessionUseCaseImpl:
         }
 
         # Pre-populate Redis with existing session
-        redis_client = await mock_redis_adapter.get_client()
-        await redis_client.setex(
+        await mock_redis_client.setex(
             f"session:{session_id}", 3600, json.dumps(existing_session_data)
         )
 
@@ -65,7 +64,7 @@ class TestStartChatSessionUseCaseImpl:
         assert result.metadata == {"user_agent": "old-browser", "ip": "192.168.1.1"}
 
     @pytest.mark.asyncio
-    async def test_execute_with_new_session(self, use_case, mock_redis_adapter):
+    async def test_execute_with_new_session(self, use_case, mock_redis_client):
         """Test that new session is created and stored in Redis."""
         # Arrange
         session_id = "new-session-456"
@@ -84,8 +83,7 @@ class TestStartChatSessionUseCaseImpl:
         assert isinstance(result.last_activity, datetime)
 
         # Assert - Verify Redis storage
-        redis_client = await mock_redis_adapter.get_client()
-        stored_value = await redis_client.get(f"session:{session_id}")
+        stored_value = await mock_redis_client.get(f"session:{session_id}")
         assert stored_value is not None
 
         stored_data = json.loads(stored_value)
@@ -95,7 +93,7 @@ class TestStartChatSessionUseCaseImpl:
         assert stored_data["metadata"] == metadata
 
     @pytest.mark.asyncio
-    async def test_execute_with_empty_metadata(self, use_case, mock_redis_adapter):
+    async def test_execute_with_empty_metadata(self, use_case, mock_redis_client):
         """Test that session can be created with empty metadata."""
         # Arrange
         session_id = "session-no-metadata"
@@ -110,13 +108,12 @@ class TestStartChatSessionUseCaseImpl:
         assert result.metadata == {}
 
         # Verify storage
-        redis_client = await mock_redis_adapter.get_client()
-        stored_value = await redis_client.get(f"session:{session_id}")
+        stored_value = await mock_redis_client.get(f"session:{session_id}")
         stored_data = json.loads(stored_value)
         assert stored_data["metadata"] == {}
 
     @pytest.mark.asyncio
-    async def test_execute_preserves_timestamps(self, use_case, mock_redis_adapter):
+    async def test_execute_preserves_timestamps(self, use_case, mock_redis_client):
         """Test that timestamps are properly preserved when retrieving existing
         session."""
         # Arrange
@@ -136,8 +133,7 @@ class TestStartChatSessionUseCaseImpl:
         }
 
         # Pre-populate Redis
-        redis_client = await mock_redis_adapter.get_client()
-        await redis_client.setex(
+        await mock_redis_client.setex(
             f"session:{session_id}", 3600, json.dumps(existing_session_data)
         )
 
@@ -151,7 +147,7 @@ class TestStartChatSessionUseCaseImpl:
         assert result.metadata == {"source": "original"}
 
     @pytest.mark.asyncio
-    async def test_redis_key_format(self, use_case, mock_redis_adapter):
+    async def test_redis_key_format(self, use_case, mock_redis_client):
         """Test that the correct Redis key format is used."""
         # Arrange
         session_id = "key-format-test"
@@ -162,13 +158,12 @@ class TestStartChatSessionUseCaseImpl:
 
         # Assert - Verify key format by checking storage
         expected_key = f"session:{session_id}"
-        redis_client = await mock_redis_adapter.get_client()
-        stored_value = await redis_client.get(expected_key)
+        stored_value = await mock_redis_client.get(expected_key)
         assert stored_value is not None  # Key exists with correct format
 
     @pytest.mark.asyncio
     async def test_ttl_is_set_correctly(
-        self, use_case, mock_redis_adapter, mock_redis_client
+        self, use_case, mock_redis_client
     ):
         """Test that TTL is set to 3600 seconds (1 hour) for new sessions."""
         # Arrange
@@ -183,12 +178,11 @@ class TestStartChatSessionUseCaseImpl:
         assert f"session:{session_id}" in mock_redis_client._expiry
 
         # Verify the data exists
-        redis_client = await mock_redis_adapter.get_client()
-        stored_value = await redis_client.get(f"session:{session_id}")
+        stored_value = await mock_redis_client.get(f"session:{session_id}")
         assert stored_value is not None
 
     @pytest.mark.asyncio
-    async def test_session_retrieval_idempotency(self, use_case, mock_redis_adapter):
+    async def test_session_retrieval_idempotency(self, use_case, mock_redis_client):
         """Test that retrieving the same session multiple times returns
         consistent data."""
         # Arrange
@@ -209,13 +203,13 @@ class TestStartChatSessionUseCaseImpl:
         assert second_result.metadata == metadata
 
     @pytest.mark.asyncio
-    async def test_concurrent_session_creation(self, mock_redis_adapter):
+    async def test_concurrent_session_creation(self, mock_redis_client):
         """Test that concurrent requests for the same session ID are handled
         correctly."""
         # Arrange
         session_id = "concurrent-session"
-        use_case1 = StartChatSessionUseCaseImpl(None, mock_redis_adapter)
-        use_case2 = StartChatSessionUseCaseImpl(None, mock_redis_adapter)
+        use_case1 = StartChatSessionUseCaseImpl(None, mock_redis_client)
+        use_case2 = StartChatSessionUseCaseImpl(None, mock_redis_client)
 
         # Act - Simulate concurrent execution
         result1 = await use_case1.execute(session_id, {"client": "1"})

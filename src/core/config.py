@@ -1,6 +1,6 @@
 from typing import List, Optional
 from pydantic_settings import BaseSettings
-from pydantic import AnyHttpUrl, PostgresDsn, RedisDsn, field_validator
+from pydantic import AnyHttpUrl, PostgresDsn, RedisDsn, field_validator, ConfigDict
 from pydantic_core import MultiHostUrl
 
 
@@ -18,6 +18,20 @@ class Settings(BaseSettings):
     POSTGRES_PASSWORD: str
     POSTGRES_DB: str
     DATABASE_URL: Optional[PostgresDsn] = None
+
+    @field_validator("WEBSOCKET_HEARTBEAT_INTERVAL", mode="before")
+    @classmethod
+    def set_heartbeat_interval(cls, v: Optional[int], values) -> int:
+        if v is not None:
+            return v
+        return values.data.get("WS_HEARTBEAT_INTERVAL", 30)
+
+    @field_validator("MAX_MESSAGES_PER_MINUTE", mode="before")
+    @classmethod
+    def set_message_rate_limit(cls, v: Optional[int], values) -> int:
+        if v is not None:
+            return v
+        return values.data.get("WS_MESSAGE_RATE_LIMIT", 10)
 
     @field_validator("DATABASE_URL", mode="before")
     @classmethod
@@ -60,15 +74,18 @@ class Settings(BaseSettings):
     WS_HEARTBEAT_INTERVAL: int
     WS_MAX_CONNECTIONS: int
     WS_MESSAGE_RATE_LIMIT: int
+    WEBSOCKET_HEARTBEAT_INTERVAL: Optional[int] = None  # Alias for WS_HEARTBEAT_INTERVAL
+    MAX_MESSAGES_PER_MINUTE: Optional[int] = None  # Alias for WS_MESSAGE_RATE_LIMIT
 
     # Security
     SECRET_KEY: str
     ALGORITHM: str
     ACCESS_TOKEN_EXPIRE_MINUTES: int
 
-    class Config:
-        env_file = ".env"
-        case_sensitive = True
+    model_config = ConfigDict(
+        env_file=".env",
+        case_sensitive=True
+    )
 
 
 settings = Settings()

@@ -18,8 +18,7 @@ class StartChatSessionUseCaseImpl(StartChatSessionUseCase):
         """Start a new chat session"""
 
         # Check if session already exists
-        redis = await self.redis_client.get_client()
-        existing = await redis.get(f"session:{session_id}")
+        existing = await self.redis_client.get(f"session:{session_id}")
 
         if existing:
             # Parse the JSON string back to dict
@@ -51,7 +50,7 @@ class StartChatSessionUseCaseImpl(StartChatSessionUseCase):
             "metadata": session.metadata,
         }
 
-        await redis.setex(
+        await self.redis_client.setex(
             f"session:{session_id}", 3600, json.dumps(session_data)  # 1 hour TTL
         )
 

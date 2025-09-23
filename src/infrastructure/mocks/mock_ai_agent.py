@@ -220,7 +220,7 @@ class MockAIAgent(AIAgentPort):
             [
                 "Selamat datang di SMS Perkasa! Ada yang bisa saya bantu?",
                 "Halo! Saya PERKY, asisten produk baja Anda. Apa yang Anda cari?",
-                "Selamat datang! Kami siap membantu kebutuhan material baja Anda.",
+                "Selamat datang di SMS Perkasa! Kami siap membantu kebutuhan material baja Anda.",
                 "Halo! Selamat datang di SMS Perkasa. Bagaimana kami bisa membantu Anda hari ini?",
                 "Selamat datang! PERKY di sini, siap membantu kebutuhan baja Anda.",
             ]
