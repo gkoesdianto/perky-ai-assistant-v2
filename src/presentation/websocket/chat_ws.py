@@ -48,8 +48,8 @@ class ChatWebSocket:
             message_queue: Optional message queue (creates default if None)
             rate_limiter: Optional rate limiter (creates default if None)
             message_validator: Optional message validator (creates default if None)
-            message_rate_limiter: Optional enhanced rate limiter (creates default if None)
-            reconnection_manager: Optional reconnection manager (creates default if None)
+            message_rate_limiter: Optional enhanced rate limiter
+            reconnection_manager: Optional reconnection manager
         """
         self.chat_orchestrator = chat_orchestrator
         self.connection_manager = connection_manager or ConnectionManager()
@@ -59,12 +59,17 @@ class ChatWebSocket:
             max_per_minute=settings.MAX_MESSAGES_PER_MINUTE
         )
         self.message_validator = message_validator or MessageValidator()
-        self.message_rate_limiter = message_rate_limiter or MessageRateLimiter(
-            max_messages_per_minute=settings.MAX_MESSAGES_PER_MINUTE,
-            max_messages_per_hour=500,
-            max_burst_size=5,
+        self.message_rate_limiter = (
+            message_rate_limiter
+            or MessageRateLimiter(
+                max_messages_per_minute=settings.MAX_MESSAGES_PER_MINUTE,
+                max_messages_per_hour=500,
+                max_burst_size=5,
+            )
         )
-        self.reconnection_manager = reconnection_manager or ReconnectionManager()
+        self.reconnection_manager = (
+            reconnection_manager or ReconnectionManager()
+        )
         self.last_activity: Dict[str, datetime] = {}
 
     async def websocket_endpoint(self, websocket: WebSocket, session_id: str):
@@ -201,7 +206,10 @@ class ChatWebSocket:
         welcome_message = {
             "type": MessageType.SYSTEM.value,
             "event": SystemEvent.CONNECTED.value,
-            "message": "Selamat datang di SMS Perkasa Steel Chat! Ada yang bisa PERKY bantu?",
+            "message": (
+                "Selamat datang di SMS Perkasa Steel Chat! "
+                "Ada yang bisa PERKY bantu?"
+            ),
             "session": {
                 "session_id": session_dto.session_id,
                 "started_at": session_dto.started_at.isoformat(),
@@ -253,35 +261,12 @@ class ChatWebSocket:
                 # Receive message
                 raw_data = await websocket.receive_text()
 
-                # Parse message
-                try:
-                    data = json.loads(raw_data)
-                    message = WebSocketMessage(**data)
-                except (json.JSONDecodeError, ValueError) as e:
-                    await self._send_error(
-                        connection_id, f"Format pesan tidak valid: {e}"
-                    )
-                    continue
-
-                # Route message by type
-                if message.type == MessageType.USER_MESSAGE:
-                    await self._handle_user_message(
-                        connection_id=connection_id,
-                        session_id=session_id,
-                        message=message,
-                    )
-
-                elif message.type == MessageType.PING:
-                    await self._handle_ping(connection_id)
-
-                elif message.type == MessageType.HEARTBEAT:
-                    # Update activity timestamp
-                    self.last_activity[connection_id] = datetime.now()
-
-                else:
-                    logger.warning(
-                        f"Unknown message type from {connection_id}: {message.type}"
-                    )
+                # Process the received message
+                await self._process_raw_message(
+                    raw_data=raw_data,
+                    connection_id=connection_id,
+                    session_id=session_id,
+                )
 
             except WebSocketDisconnect:
                 break
@@ -289,6 +274,88 @@ class ChatWebSocket:
             except Exception as e:
                 logger.error(f"Message processing error: {e}", exc_info=True)
                 await self._send_error(connection_id, "Terjadi kesalahan")
+
+    async def _process_raw_message(
+        self, raw_data: str, connection_id: str, session_id: str
+    ):
+        """
+        Process raw message data.
+
+        Args:
+            raw_data: Raw message string
+            connection_id: Connection identifier
+            session_id: Session identifier
+        """
+        try:
+            data = json.loads(raw_data)
+            await self._route_message(
+                data=data, connection_id=connection_id, session_id=session_id
+            )
+        except json.JSONDecodeError as e:
+            await self._send_validation_error(
+                connection_id, f"Format JSON tidak valid: {e}"
+            )
+
+    async def _route_message(self, data: dict, connection_id: str, session_id: str):
+        """
+        Route message based on type.
+
+        Args:
+            data: Parsed message data
+            connection_id: Connection identifier
+            session_id: Session identifier
+        """
+        message_type = data.get("type")
+
+        if message_type == MessageType.USER_MESSAGE.value:
+            await self._process_user_message(
+                data=data, connection_id=connection_id, session_id=session_id
+            )
+        elif message_type == "ping":
+            await self._handle_ping(connection_id)
+        elif message_type == MessageType.HEARTBEAT.value:
+            self.last_activity[connection_id] = datetime.now()
+        else:
+            await self._handle_unknown_message_type(
+                connection_id=connection_id, message_type=message_type
+            )
+
+    async def _process_user_message(
+        self, data: dict, connection_id: str, session_id: str
+    ):
+        """
+        Process user message.
+
+        Args:
+            data: Message data
+            connection_id: Connection identifier
+            session_id: Session identifier
+        """
+        try:
+            message = WebSocketMessage(**data)
+            await self._handle_user_message(
+                connection_id=connection_id,
+                session_id=session_id,
+                message=message,
+            )
+        except (ValueError, TypeError) as e:
+            await self._send_validation_error(
+                connection_id, f"Format pesan tidak valid: {e}"
+            )
+
+    async def _handle_unknown_message_type(self, connection_id: str, message_type: str):
+        """
+        Handle unknown message type.
+
+        Args:
+            connection_id: Connection identifier
+            message_type: Unknown message type
+        """
+        await self._send_validation_error(
+            connection_id,
+            f"Validation error: Unknown message type '{message_type}'",
+        )
+        logger.warning(f"Unknown message type from {connection_id}: {message_type}")
 
     async def _handle_user_message(
         self, connection_id: str, session_id: str, message: WebSocketMessage
@@ -306,13 +373,13 @@ class ChatWebSocket:
             message.message if message.message else ""
         )
         if not is_valid:
-            await self._send_error(connection_id, error_msg)
+            await self._send_validation_error(connection_id, error_msg)
             return
 
         # Check enhanced rate limit
         is_allowed, rate_error = self.message_rate_limiter.is_allowed(connection_id)
         if not is_allowed:
-            await self._send_error(connection_id, rate_error)
+            await self._send_validation_error(connection_id, rate_error)
             return
 
         # Sanitize message for safe display
@@ -404,7 +471,7 @@ class ChatWebSocket:
             connection_id: Connection identifier
         """
         await self.send_personal_message(
-            {"type": MessageType.PONG.value, "timestamp": datetime.now().isoformat()},
+            {"type": "pong", "timestamp": datetime.now().isoformat()},
             connection_id,
         )
 
@@ -420,6 +487,23 @@ class ChatWebSocket:
             {
                 "type": MessageType.ERROR.value,
                 "event": SystemEvent.ERROR.value,
+                "message": error_message,
+                "timestamp": datetime.now().isoformat(),
+            },
+            connection_id,
+        )
+
+    async def _send_validation_error(self, connection_id: str, error_message: str):
+        """
+        Send validation error message to client.
+
+        Args:
+            connection_id: Connection identifier
+            error_message: Error message to send
+        """
+        await self.send_personal_message(
+            {
+                "type": "error",
                 "message": error_message,
                 "timestamp": datetime.now().isoformat(),
             },

@@ -1,0 +1,674 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Steel Chat - Test Client</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            height: 100vh;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+        }
+
+        .chat-container {
+            width: 100%;
+            max-width: 600px;
+            height: 80vh;
+            background: white;
+            border-radius: 10px;
+            box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+            display: flex;
+            flex-direction: column;
+        }
+
+        .chat-header {
+            background: #2c3e50;
+            color: white;
+            padding: 20px;
+            border-radius: 10px 10px 0 0;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .chat-header h1 {
+            font-size: 1.5rem;
+        }
+
+        .connection-status {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .status-dot {
+            width: 10px;
+            height: 10px;
+            border-radius: 50%;
+            background: #e74c3c;
+        }
+
+        .status-dot.connected {
+            background: #2ecc71;
+            animation: pulse 2s infinite;
+        }
+
+        @keyframes pulse {
+            0% { opacity: 1; }
+            50% { opacity: 0.5; }
+            100% { opacity: 1; }
+        }
+
+        .messages-container {
+            flex: 1;
+            overflow-y: auto;
+            padding: 20px;
+            background: #f8f9fa;
+        }
+
+        .message {
+            margin-bottom: 15px;
+            animation: slideIn 0.3s ease;
+        }
+
+        @keyframes slideIn {
+            from {
+                transform: translateY(20px);
+                opacity: 0;
+            }
+            to {
+                transform: translateY(0);
+                opacity: 1;
+            }
+        }
+
+        .message.user {
+            text-align: right;
+        }
+
+        .message.ai {
+            text-align: left;
+        }
+
+        .message-bubble {
+            display: inline-block;
+            padding: 12px 20px;
+            border-radius: 18px;
+            max-width: 70%;
+            word-wrap: break-word;
+        }
+
+        .user .message-bubble {
+            background: #3498db;
+            color: white;
+        }
+
+        .ai .message-bubble {
+            background: white;
+            color: #333;
+            box-shadow: 0 2px 5px rgba(0, 0, 0, 0.1);
+        }
+
+        .system-message {
+            text-align: center;
+            color: #7f8c8d;
+            font-size: 0.9rem;
+            margin: 10px 0;
+            font-style: italic;
+        }
+
+        .typing-indicator {
+            display: none;
+            padding: 12px 20px;
+            background: white;
+            border-radius: 18px;
+            display: inline-block;
+            box-shadow: 0 2px 5px rgba(0, 0, 0, 0.1);
+        }
+
+        .typing-indicator.active {
+            display: inline-block;
+        }
+
+        .typing-indicator span {
+            display: inline-block;
+            width: 8px;
+            height: 8px;
+            border-radius: 50%;
+            background: #95a5a6;
+            margin: 0 2px;
+            animation: typing 1.4s infinite;
+        }
+
+        .typing-indicator span:nth-child(2) {
+            animation-delay: 0.2s;
+        }
+
+        .typing-indicator span:nth-child(3) {
+            animation-delay: 0.4s;
+        }
+
+        @keyframes typing {
+            0%, 60%, 100% {
+                transform: translateY(0);
+            }
+            30% {
+                transform: translateY(-10px);
+            }
+        }
+
+        .input-container {
+            padding: 20px;
+            background: white;
+            border-top: 1px solid #ecf0f1;
+            border-radius: 0 0 10px 10px;
+        }
+
+        .input-wrapper {
+            display: flex;
+            gap: 10px;
+        }
+
+        #messageInput {
+            flex: 1;
+            padding: 12px 15px;
+            border: 2px solid #ecf0f1;
+            border-radius: 25px;
+            font-size: 1rem;
+            outline: none;
+            transition: border-color 0.3s;
+        }
+
+        #messageInput:focus {
+            border-color: #3498db;
+        }
+
+        #sendButton {
+            padding: 12px 25px;
+            background: #3498db;
+            color: white;
+            border: none;
+            border-radius: 25px;
+            cursor: pointer;
+            font-size: 1rem;
+            transition: background 0.3s;
+        }
+
+        #sendButton:hover:not(:disabled) {
+            background: #2980b9;
+        }
+
+        #sendButton:disabled {
+            background: #95a5a6;
+            cursor: not-allowed;
+        }
+
+        .debug-panel {
+            position: fixed;
+            bottom: 20px;
+            right: 20px;
+            background: rgba(0, 0, 0, 0.8);
+            color: white;
+            padding: 10px;
+            border-radius: 5px;
+            font-family: monospace;
+            font-size: 0.8rem;
+            max-width: 300px;
+        }
+
+        .debug-panel h3 {
+            margin-bottom: 10px;
+        }
+
+        .debug-info {
+            margin: 5px 0;
+        }
+    </style>
+</head>
+<body>
+    <div class="chat-container">
+        <div class="chat-header">
+            <h1>🏗️ Steel Chat MVP</h1>
+            <div class="connection-status">
+                <span id="statusText">Connecting...</span>
+                <div class="status-dot" id="statusDot"></div>
+            </div>
+        </div>
+
+        <div class="messages-container" id="messagesContainer">
+            <div class="system-message">Menghubungkan ke server...</div>
+        </div>
+
+        <div class="input-container">
+            <div class="input-wrapper">
+                <input
+                    type="text"
+                    id="messageInput"
+                    placeholder="Ketik pesan Anda..."
+                    disabled
+                />
+                <button id="sendButton" disabled>Kirim</button>
+            </div>
+        </div>
+    </div>
+
+    <div class="debug-panel" id="debugPanel" style="display: none;">
+        <h3>Debug Info</h3>
+        <div class="debug-info">Session: <span id="debugSession">-</span></div>
+        <div class="debug-info">Status: <span id="debugStatus">-</span></div>
+        <div class="debug-info">Messages: <span id="debugMessages">0</span></div>
+        <div class="debug-info">Ping: <span id="debugPing">-</span></div>
+    </div>
+
+    <script>
+        // Configuration
+        const CONFIG = {
+            wsUrl: 'ws://localhost:8000/api/v1/ws',
+            sessionId: `test-${Date.now()}`,
+            reconnectAttempts: 3,
+            reconnectDelay: 2000,
+            heartbeatInterval: 30000,
+            debug: true
+        };
+
+        // State management
+        const state = {
+            ws: null,
+            connected: false,
+            messageCount: 0,
+            lastPing: null,
+            reconnectCount: 0,
+            typingTimeout: null
+        };
+
+        // DOM elements
+        const elements = {
+            messagesContainer: document.getElementById('messagesContainer'),
+            messageInput: document.getElementById('messageInput'),
+            sendButton: document.getElementById('sendButton'),
+            statusText: document.getElementById('statusText'),
+            statusDot: document.getElementById('statusDot'),
+            debugPanel: document.getElementById('debugPanel'),
+            debugSession: document.getElementById('debugSession'),
+            debugStatus: document.getElementById('debugStatus'),
+            debugMessages: document.getElementById('debugMessages'),
+            debugPing: document.getElementById('debugPing')
+        };
+
+        // WebSocket connection
+        function connect() {
+            const wsUrl = `${CONFIG.wsUrl}/${CONFIG.sessionId}`;
+
+            updateStatus('Connecting...', false);
+
+            try {
+                state.ws = new WebSocket(wsUrl);
+
+                state.ws.onopen = handleOpen;
+                state.ws.onmessage = handleMessage;
+                state.ws.onerror = handleError;
+                state.ws.onclose = handleClose;
+
+            } catch (error) {
+                console.error('Connection error:', error);
+                handleError(error);
+            }
+        }
+
+        // Event handlers
+        function handleOpen(event) {
+            console.log('WebSocket connected');
+            state.connected = true;
+            state.reconnectCount = 0;
+
+            updateStatus('Connected', true);
+            enableInput(true);
+
+            // Start heartbeat
+            startHeartbeat();
+
+            // Update debug
+            if (CONFIG.debug) {
+                elements.debugPanel.style.display = 'block';
+                elements.debugSession.textContent = CONFIG.sessionId;
+                elements.debugStatus.textContent = 'Connected';
+            }
+        }
+
+        function handleMessage(event) {
+            try {
+                const data = JSON.parse(event.data);
+                console.log('Message received:', data);
+
+                switch (data.type) {
+                    case 'system':
+                        handleSystemMessage(data);
+                        break;
+
+                    case 'user_message':
+                        // Only show if from another connection
+                        if (data.metadata && data.metadata.from_connection) {
+                            addMessage(data.message, 'user');
+                        }
+                        break;
+
+                    case 'ai_response':
+                        hideTypingIndicator();
+                        addMessage(data.message, 'ai');
+                        break;
+
+                    case 'error':
+                        hideTypingIndicator();
+                        addSystemMessage(`Error: ${data.message}`);
+                        break;
+
+                    case 'heartbeat':
+                        // Silent heartbeat acknowledgment
+                        console.log('Heartbeat received');
+                        break;
+
+                    case 'pong':
+                        handlePong(data);
+                        break;
+
+                    default:
+                        console.warn('Unknown message type:', data.type);
+                }
+
+                // Update message count
+                state.messageCount++;
+                if (CONFIG.debug) {
+                    elements.debugMessages.textContent = state.messageCount;
+                }
+
+            } catch (error) {
+                console.error('Failed to parse message:', error);
+            }
+        }
+
+        function handleError(event) {
+            console.error('WebSocket error:', event);
+            updateStatus('Error', false);
+
+            if (CONFIG.debug) {
+                elements.debugStatus.textContent = 'Error';
+            }
+        }
+
+        function handleClose(event) {
+            console.log('WebSocket closed:', event);
+            state.connected = false;
+
+            updateStatus('Disconnected', false);
+            enableInput(false);
+
+            // Stop heartbeat
+            stopHeartbeat();
+
+            // Attempt reconnection
+            if (state.reconnectCount < CONFIG.reconnectAttempts) {
+                state.reconnectCount++;
+                addSystemMessage(
+                    `Koneksi terputus. Mencoba menyambung kembali... (${state.reconnectCount}/${CONFIG.reconnectAttempts})`
+                );
+
+                setTimeout(connect, CONFIG.reconnectDelay);
+            } else {
+                addSystemMessage('Tidak dapat terhubung ke server. Silakan refresh halaman.');
+            }
+
+            if (CONFIG.debug) {
+                elements.debugStatus.textContent = 'Disconnected';
+            }
+        }
+
+        // System message handlers
+        function handleSystemMessage(data) {
+            switch (data.event) {
+                case 'connected':
+                    addSystemMessage(data.message);
+                    break;
+
+                case 'typing':
+                    showTypingIndicator();
+                    break;
+
+                case 'disconnected':
+                    addSystemMessage(data.message);
+                    break;
+
+                case 'error':
+                    addSystemMessage(`Error: ${data.message}`);
+                    break;
+
+                default:
+                    if (data.message) {
+                        addSystemMessage(data.message);
+                    }
+            }
+        }
+
+        // UI functions
+        function addMessage(content, type) {
+            const messageDiv = document.createElement('div');
+            messageDiv.className = `message ${type}`;
+
+            const bubbleDiv = document.createElement('div');
+            bubbleDiv.className = 'message-bubble';
+            bubbleDiv.textContent = content;
+
+            messageDiv.appendChild(bubbleDiv);
+            elements.messagesContainer.appendChild(messageDiv);
+
+            scrollToBottom();
+        }
+
+        function addSystemMessage(content) {
+            const messageDiv = document.createElement('div');
+            messageDiv.className = 'system-message';
+            messageDiv.textContent = content;
+
+            elements.messagesContainer.appendChild(messageDiv);
+            scrollToBottom();
+        }
+
+        function showTypingIndicator() {
+            // Clear existing timeout
+            if (state.typingTimeout) {
+                clearTimeout(state.typingTimeout);
+            }
+
+            // Check if indicator already exists
+            let indicator = document.querySelector('.typing-indicator');
+
+            if (!indicator) {
+                indicator = document.createElement('div');
+                indicator.className = 'typing-indicator active';
+                indicator.innerHTML = '<span></span><span></span><span></span>';
+
+                const messageDiv = document.createElement('div');
+                messageDiv.className = 'message ai typing-message';
+                messageDiv.appendChild(indicator);
+
+                elements.messagesContainer.appendChild(messageDiv);
+                scrollToBottom();
+            }
+
+            // Auto-hide after 5 seconds
+            state.typingTimeout = setTimeout(hideTypingIndicator, 5000);
+        }
+
+        function hideTypingIndicator() {
+            const typingMessage = document.querySelector('.typing-message');
+            if (typingMessage) {
+                typingMessage.remove();
+            }
+
+            if (state.typingTimeout) {
+                clearTimeout(state.typingTimeout);
+                state.typingTimeout = null;
+            }
+        }
+
+        function scrollToBottom() {
+            elements.messagesContainer.scrollTop = elements.messagesContainer.scrollHeight;
+        }
+
+        function updateStatus(text, connected) {
+            elements.statusText.textContent = text;
+
+            if (connected) {
+                elements.statusDot.classList.add('connected');
+            } else {
+                elements.statusDot.classList.remove('connected');
+            }
+        }
+
+        function enableInput(enabled) {
+            elements.messageInput.disabled = !enabled;
+            elements.sendButton.disabled = !enabled;
+
+            if (enabled) {
+                elements.messageInput.focus();
+            }
+        }
+
+        // Message sending
+        function sendMessage() {
+            const message = elements.messageInput.value.trim();
+
+            if (!message || !state.connected) {
+                return;
+            }
+
+            // Display user message immediately
+            addMessage(message, 'user');
+
+            // Send to server
+            const data = {
+                type: 'user_message',
+                message: message,
+                metadata: {
+                    timestamp: new Date().toISOString()
+                }
+            };
+
+            try {
+                state.ws.send(JSON.stringify(data));
+                elements.messageInput.value = '';
+
+            } catch (error) {
+                console.error('Failed to send message:', error);
+                addSystemMessage('Gagal mengirim pesan. Silakan coba lagi.');
+            }
+        }
+
+        // Heartbeat management
+        let heartbeatInterval = null;
+
+        function startHeartbeat() {
+            stopHeartbeat();
+
+            heartbeatInterval = setInterval(() => {
+                if (state.connected && state.ws.readyState === WebSocket.OPEN) {
+                    sendPing();
+                }
+            }, CONFIG.heartbeatInterval);
+
+            // Send initial ping
+            sendPing();
+        }
+
+        function stopHeartbeat() {
+            if (heartbeatInterval) {
+                clearInterval(heartbeatInterval);
+                heartbeatInterval = null;
+            }
+        }
+
+        function sendPing() {
+            if (state.ws && state.ws.readyState === WebSocket.OPEN) {
+                state.lastPing = Date.now();
+
+                state.ws.send(JSON.stringify({
+                    type: 'ping',
+                    timestamp: new Date().toISOString()
+                }));
+
+                console.log('Ping sent');
+            }
+        }
+
+        function handlePong(data) {
+            if (state.lastPing) {
+                const latency = Date.now() - state.lastPing;
+                console.log(`Pong received. Latency: ${latency}ms`);
+
+                if (CONFIG.debug) {
+                    elements.debugPing.textContent = `${latency}ms`;
+                }
+            }
+        }
+
+        // Event listeners
+        elements.sendButton.addEventListener('click', sendMessage);
+
+        elements.messageInput.addEventListener('keypress', (e) => {
+            if (e.key === 'Enter' && !e.shiftKey) {
+                e.preventDefault();
+                sendMessage();
+            }
+        });
+
+        // Keyboard shortcuts
+        document.addEventListener('keydown', (e) => {
+            // Ctrl+D to toggle debug panel
+            if (e.ctrlKey && e.key === 'd') {
+                e.preventDefault();
+                const panel = elements.debugPanel;
+                panel.style.display = panel.style.display === 'none' ? 'block' : 'none';
+            }
+
+            // Escape to clear input
+            if (e.key === 'Escape') {
+                elements.messageInput.value = '';
+            }
+        });
+
+        // Page visibility handling
+        document.addEventListener('visibilitychange', () => {
+            if (document.hidden) {
+                console.log('Page hidden - reducing activity');
+            } else {
+                console.log('Page visible - resuming activity');
+                if (!state.connected) {
+                    connect();
+                }
+            }
+        });
+
+        // Initialize connection
+        window.addEventListener('load', () => {
+            console.log('Initializing Steel Chat client...');
+            connect();
+        });
+
+        // Cleanup on unload
+        window.addEventListener('beforeunload', () => {
+            if (state.ws && state.ws.readyState === WebSocket.OPEN) {
+                state.ws.close();
+            }
+        });
+    </script>
+</body>
+</html>

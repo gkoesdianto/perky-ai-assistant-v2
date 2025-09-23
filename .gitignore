@@ -4,6 +4,8 @@
 __pycache__/
 *.py[cod]
 *$py.class
+*.pyc
+*.pyo
 *.so
 .Python
 build/
@@ -179,6 +181,11 @@ htmlcov/
 test-results/
 junit.xml
 .mutmut-cache
+# Temporary test files
+test_debug*.py
+debug_*.py
+test_tmp*.py
+temp_test*.py
 
 # ============================================
 # Type Checking
