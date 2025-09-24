@@ -405,17 +405,68 @@ GREETING_TEMPLATES = {
 }
 
 PRODUCT_INQUIRY_TEMPLATES = {
-    "availability": "Baik, saya akan cek ketersediaan {product} untuk Anda.",
-    "specifications": "Berikut spesifikasi lengkap untuk {product}:",
-    "pricing": "Untuk harga {product}, saya perlu tahu jumlah yang Anda butuhkan.",
+    "availability": "Baik, saya akan cek ketersediaan varian {variant_name} untuk Anda.",
+    "specifications": "Berikut spesifikasi lengkap untuk {variant_name}:",
+    "pricing": "Untuk {variant_name}, harga per {stock_unit}: {display_price}",
+    "pricing_inquiry": "Produk {product_name} memiliki beberapa varian. Varian mana yang Anda butuhkan?",
+    "variant_options": "Produk {product_name} tersedia dalam {variant_count} varian:",
+    "variant_list": "- {variant_name}: {display_price} per {stock_unit} (Stok: {stock_quantity})",
     "recommendation": "Berdasarkan kebutuhan Anda, saya merekomendasikan produk berikut:"
 }
 
+STOCK_MESSAGES = {
+    "in_stock": "✅ {variant_name} tersedia: {stock_quantity} {stock_unit}",
+    "low_stock": "⚠️ Stok {variant_name} terbatas: tersisa {stock_quantity} {stock_unit}",
+    "out_of_stock": "❌ Mohon maaf, stok {variant_name} sedang kosong",
+    "product_stock_summary": "Stok {product_name}: {available_variants} dari {total_variants} varian tersedia",
+    "all_variants_available": "✅ Semua varian {product_name} tersedia",
+    "some_variants_available": "⚠️ Beberapa varian {product_name} tersedia",
+    "no_variants_available": "❌ Semua varian {product_name} sedang kosong"
+}
+
+PRICE_TEMPLATES = {
+    "unit_price": "{display_price} per {stock_unit}",
+    "total_price": "Total untuk {quantity} {stock_unit}: {total_price}",
+    "price_range": "Harga {product_name}: {min_price} - {max_price} (tergantung varian)",
+    "volume_discount": "Diskon {discount_percentage}% untuk pembelian di atas {min_quantity} {stock_unit}",
+    "final_price_with_discount": "Harga setelah diskon: {final_price} (hemat {discount_amount})"
+}
+
 ERROR_MESSAGES = {
-    "not_found": "Maaf, produk yang Anda cari tidak ditemukan. Bisa saya bantu dengan produk lain?",
-    "out_of_stock": "Mohon maaf, stok {product} sedang kosong. Estimasi tersedia {date}.",
+    "product_not_found": "Maaf, produk {product_name} tidak ditemukan dalam katalog kami.",
+    "variant_not_found": "Maaf, varian {variant_spec} tidak tersedia untuk produk {product_name}.",
+    "variant_out_of_stock": "Mohon maaf, stok {variant_name} sedang kosong. Estimasi tersedia {date}.",
+    "insufficient_stock": "Stok {variant_name} tidak mencukupi. Tersedia: {available} {stock_unit}",
     "system_error": "Mohon maaf, terjadi kesalahan sistem. Tim kami akan segera memperbaikinya.",
-    "clarification": "Mohon maaf, saya perlu informasi lebih detail. Bisa tolong jelaskan spesifikasi yang Anda butuhkan?"
+    "clarification": "Mohon maaf, saya perlu informasi lebih detail. Bisa tolong jelaskan spesifikasi yang Anda butuhkan?",
+    "variant_selection_needed": "Produk {product_name} memiliki beberapa varian. Mohon pilih spesifikasi yang Anda inginkan:",
+    "specification_needed": "Untuk memberikan harga yang tepat, saya perlu tahu spesifikasi: {required_specs}"
+}
+
+VARIANT_SELECTION_TEMPLATES = {
+    "thickness_selection": "Pilih ketebalan yang dibutuhkan: {available_thicknesses}",
+    "size_selection": "Pilih ukuran yang dibutuhkan: {available_sizes}",
+    "material_selection": "Pilih grade material: {available_materials}",
+    "confirm_variant": "Apakah Anda memilih {variant_name}? (SKU: {sku})",
+    "variant_details": """
+{variant_name}
+- SKU: {sku}
+- Harga: {display_price}/{stock_unit}
+- Stok: {stock_quantity} {stock_unit}
+- Spesifikasi: {specifications}
+"""
+}
+
+UNIT_TEMPLATES = {
+    "lembar": "lembar (sheet)",
+    "batang": "batang (bar/rod)",
+    "kg": "kilogram",
+    "meter": "meter",
+    "roll": "roll",
+    "unit": "unit",
+    "pcs": "pcs (pieces)",
+    "quantity_format": "{quantity} {stock_unit}",
+    "minimum_order": "Minimum order: {min_quantity} {stock_unit}"
 }
 
 CLOSING_TEMPLATES = {
@@ -423,6 +474,249 @@ CLOSING_TEMPLATES = {
     "need_help": "Ada yang bisa saya bantu lagi?",
     "thank_you": "Terima kasih telah menghubungi SMS Perkasa. Semoga hari Anda menyenangkan!"
 }
+```
+
+### 1.3 Simple Template Integration for MVP
+
+#### Modifications to Existing ChatAgent
+
+```python
+# src/infrastructure/ai/chat_agent.py - Simple template integration
+
+# 1. Add imports at the top (after existing imports)
+from src.infrastructure.ai.prompts.indonesian_templates import (
+    GREETING_TEMPLATES, STOCK_MESSAGES, PRICE_TEMPLATES, ERROR_MESSAGES
+)
+from datetime import datetime
+
+class ChatAgent(AIAgentPort):
+    """PydanticAI-based chat agent for Indonesian steel products."""
+
+    # 2. Add simple helper methods for templates
+    def _get_greeting(self) -> str:
+        """Get appropriate greeting based on time of day"""
+        hour = datetime.now().hour
+
+        if 5 <= hour < 11:
+            return GREETING_TEMPLATES["morning"]
+        elif 11 <= hour < 15:
+            return GREETING_TEMPLATES["afternoon"]
+        elif 15 <= hour < 19:
+            return GREETING_TEMPLATES["evening"]
+        else:
+            return GREETING_TEMPLATES["default"]
+
+    def _format_stock_message(self, variant: Any) -> str:
+        """Format stock information using templates"""
+        if not variant.has_stock():
+            return STOCK_MESSAGES["out_of_stock"].format(
+                variant_name=variant.variant_name
+            )
+        elif variant.stock_quantity <= 10:
+            return STOCK_MESSAGES["low_stock"].format(
+                variant_name=variant.variant_name,
+                stock_quantity=variant.stock_quantity,
+                stock_unit=variant.stock_unit
+            )
+        else:
+            return STOCK_MESSAGES["in_stock"].format(
+                variant_name=variant.variant_name,
+                stock_quantity=variant.stock_quantity,
+                stock_unit=variant.stock_unit
+            )
+
+    def _format_price_message(self, variant: Any) -> str:
+        """Format price information using templates"""
+        return PRICE_TEMPLATES["unit_price"].format(
+            display_price=variant.get_display_price(),
+            stock_unit=variant.stock_unit
+        )
+
+    # 3. Modify existing generate_response method - Add greeting detection
+    async def generate_response(
+        self,
+        message: str,
+        conversation_context: Optional[List[MessageDTO]] = None,
+        product_service: Optional[ProductServicePort] = None,
+        session_id: Optional[str] = None,
+    ) -> str:
+        """Generate a response using the PydanticAI agent."""
+        try:
+            # Simple greeting detection for first message
+            if not conversation_context or len(conversation_context) == 0:
+                greeting_keywords = ['halo', 'hai', 'pagi', 'siang', 'sore']
+                if any(word in message.lower() for word in greeting_keywords):
+                    return self._get_greeting()
+
+            # Rest of existing implementation...
+            messages = []
+            if conversation_context:
+                for msg in conversation_context[-10:]:
+                    if msg.sender_type == "user":
+                        messages.append(("user", msg.content))
+                    else:
+                        messages.append(("assistant", msg.content))
+
+            messages.append(("user", message))
+
+            deps = ChatDependencies(
+                product_service=product_service or self._create_mock_product_service(),
+                session_id=session_id or "default",
+                user_metadata={},
+            )
+
+            result = await self.agent.run(
+                message,
+                message_history=messages[:-1],
+                deps=deps,
+            )
+
+            response = result.data if hasattr(result, "data") else str(result)
+            return response
+
+        except Exception as e:
+            logger.error(f"Error generating response: {e}")
+            # Use template for error message
+            return ERROR_MESSAGES["system_error"]
+
+    # 4. Enhanced tool methods - Add template formatting to tool responses
+    async def _get_variant_details_tool(
+        self, ctx: RunContext[ChatDependencies], product_id: str, variant_id: str
+    ) -> VariantDetails:
+        """Get detailed information about a specific variant."""
+        try:
+            product_with_variants = (
+                await ctx.deps.product_service.get_product_with_variants(product_id)
+            )
+
+            if product_with_variants:
+                variant = product_with_variants.get_variant_by_id(variant_id)
+                if variant:
+                    # Create base response
+                    details = VariantDetails(
+                        variant_id=variant.variant_id,
+                        sku=variant.sku,
+                        name=variant.variant_name,
+                        price=float(variant.price),
+                        display_price=variant.get_display_price(),
+                        stock_quantity=variant.stock_quantity,
+                        stock_unit=variant.stock_unit,
+                        specifications=variant.specifications,
+                        available=variant.has_stock(),
+                    )
+
+                    # Add formatted messages to specifications for LLM to use
+                    details.specifications["_formatted_stock"] = self._format_stock_message(variant)
+                    details.specifications["_formatted_price"] = self._format_price_message(variant)
+
+                    return details
+
+            # Return empty variant if not found with error message
+            return VariantDetails(
+                variant_id=variant_id,
+                sku="NOT_FOUND",
+                name=ERROR_MESSAGES["variant_not_found"].format(
+                    variant_spec=variant_id,
+                    product_name="Unknown"
+                ),
+                price=0.0,
+                display_price="Rp 0",
+                stock_quantity=0,
+                stock_unit="unit",
+                available=False,
+            )
+        except Exception as e:
+            logger.error(f"Error getting variant details: {e}")
+            return VariantDetails(
+                variant_id=variant_id,
+                sku="ERROR",
+                name=ERROR_MESSAGES["system_error"],
+                price=0.0,
+                display_price="Rp 0",
+                stock_quantity=0,
+                stock_unit="unit",
+                available=False,
+            )
+```
+
+#### Update System Prompt to Use Templates
+
+```python
+# Modify the SYSTEM_PROMPT to instruct LLM to use template fragments
+
+SYSTEM_PROMPT = """Kamu adalah PERKY, asisten virtual untuk SMS Perkasa yang membantu
+pelanggan B2B menemukan produk baja yang tepat.
+
+[... existing prompt content ...]
+
+PANDUAN TEMPLATE:
+1. Gunakan pesan terformat yang disediakan dalam specifications["_formatted_stock"] dan
+   specifications["_formatted_price"] untuk informasi stok dan harga
+2. Untuk error, gunakan pesan yang sudah terformat dalam field 'name' jika SKU adalah 'ERROR' atau 'NOT_FOUND'
+3. Tetap gunakan bahasa yang natural dan kontekstual, tapi pastikan data faktual
+   (harga, stok, SKU) disampaikan persis seperti yang terformat
+4. Jangan ubah angka atau format harga/stok yang sudah disediakan
+
+[... rest of existing prompt ...]
+"""
+```
+
+#### Simple Integration Test
+
+```python
+# tests/unit/infrastructure/test_chat_agent_templates.py
+
+import pytest
+from datetime import datetime
+from unittest.mock import Mock, patch
+from src.infrastructure.ai.chat_agent import ChatAgent
+
+@pytest.mark.asyncio
+async def test_greeting_response():
+    """Test that greetings use templates"""
+    agent = ChatAgent.create_with_fallback()
+
+    # Mock time for consistent testing
+    with patch('src.infrastructure.ai.chat_agent.datetime') as mock_datetime:
+        mock_datetime.now.return_value.hour = 9  # Morning
+
+        response = await agent.generate_response(
+            message="Halo",
+            conversation_context=None  # First message
+        )
+
+        assert "Selamat pagi" in response
+        assert "PERKY" in response
+
+@pytest.mark.asyncio
+async def test_error_uses_template():
+    """Test that errors use templates"""
+    agent = ChatAgent.create_with_fallback()
+
+    # Force an error
+    with patch.object(agent, 'agent') as mock_agent:
+        mock_agent.run.side_effect = Exception("Test error")
+
+        response = await agent.generate_response("test message")
+
+        assert response == ERROR_MESSAGES["system_error"]
+
+@pytest.mark.asyncio
+async def test_stock_formatting():
+    """Test stock message formatting"""
+    agent = ChatAgent()
+
+    # Mock variant with low stock
+    variant = Mock()
+    variant.variant_name = "Plat Baja 5mm"
+    variant.stock_quantity = 5
+    variant.stock_unit = "lembar"
+    variant.has_stock.return_value = True
+
+    formatted = agent._format_stock_message(variant)
+
+    assert "terbatas" in formatted
+    assert "5 lembar" in formatted
 ```
 
 ---
