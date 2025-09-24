@@ -4,72 +4,45 @@ These tests verify the integration between ChatAgent and other components,
 without testing LLM responses or third-party library internals.
 """
 
-from decimal import Decimal
 from unittest.mock import AsyncMock, MagicMock, patch
+import os
 
 import pytest
 
 from src.application.dto import MessageDTO
-from src.domain.value_objects import ProductInfo, ProductWithVariantsInfo, VariantInfo
 from src.infrastructure.ai.chat_agent import ChatAgent, ChatDependencies
-from src.infrastructure.mocks.mock_product_repository import MockProductRepository
 
 
 class TestChatAgentIntegrationWithMockServices:
     """Test ChatAgent integration with mock services."""
 
-    @pytest.fixture
-    def mock_product_repository(self):
-        """Create actual MockProductRepository instance."""
-        return MockProductRepository()
-
-    @pytest.fixture
-    def chat_agent_with_mocks(self):
-        """Create ChatAgent with mocked LLM but real mock services."""
-        with patch.dict("os.environ", {"OPENAI_API_KEY": "test-key"}):
-            with patch("src.infrastructure.ai.chat_agent.Agent") as MockAgent:
-                with patch("src.infrastructure.ai.chat_agent.OpenAIChatModel"):
-                    # Create a mock agent that we can control
-                    mock_agent_instance = MagicMock()
-                    mock_agent_instance.run = AsyncMock()
-                    MockAgent.return_value = mock_agent_instance
-
-                    agent = ChatAgent()
-                    # Replace the agent with our controlled mock
-                    agent.agent = mock_agent_instance
-                    return agent
-
     @pytest.mark.asyncio
     async def test_integration_with_mock_product_service(
-        self, chat_agent_with_mocks, mock_product_repository
+        self, chat_agent_with_mocked_llm, mock_product_service
     ):
-        """Test that ChatAgent properly integrates with MockProductRepository."""
-        # Setup mock LLM response
+        """Test that ChatAgent properly integrates with mock product service."""
         mock_response = MagicMock()
         mock_response.data = "Saya akan membantu mencari produk."
-        chat_agent_with_mocks.agent.run.return_value = mock_response
+        chat_agent_with_mocked_llm.agent.run.return_value = mock_response
 
-        # Use actual mock product repository
-        response = await chat_agent_with_mocks.generate_response(
+        response = await chat_agent_with_mocked_llm.generate_response(
             message="Cari plat baja",
-            product_service=mock_product_repository,
+            product_service=mock_product_service,
             session_id="test-session",
         )
 
-        # Verify the integration happened
         assert response is not None
-        chat_agent_with_mocks.agent.run.assert_called_once()
+        chat_agent_with_mocked_llm.agent.run.assert_called_once()
 
-        # Verify dependencies were passed correctly
-        call_args = chat_agent_with_mocks.agent.run.call_args
+        call_args = chat_agent_with_mocked_llm.agent.run.call_args
         assert "deps" in call_args.kwargs
         deps = call_args.kwargs["deps"]
         assert isinstance(deps, ChatDependencies)
-        assert deps.product_service == mock_product_repository
+        assert deps.product_service == mock_product_service
         assert deps.session_id == "test-session"
 
     @pytest.mark.asyncio
-    async def test_message_context_transformation(self, chat_agent_with_mocks):
+    async def test_message_context_transformation(self, chat_agent_with_mocked_llm):
         """Test that message context is properly transformed for the LLM."""
         # Create sample messages
         messages = [
@@ -98,16 +71,16 @@ class TestChatAgentIntegrationWithMockServices:
 
         mock_response = MagicMock()
         mock_response.data = "Ya, ada"
-        chat_agent_with_mocks.agent.run.return_value = mock_response
+        chat_agent_with_mocked_llm.agent.run.return_value = mock_response
 
-        await chat_agent_with_mocks.generate_response(
+        await chat_agent_with_mocked_llm.generate_response(
             message="Berapa harganya?",
             conversation_context=messages,
             product_service=AsyncMock(),
         )
 
         # Check that message history was passed correctly
-        call_args = chat_agent_with_mocks.agent.run.call_args
+        call_args = chat_agent_with_mocked_llm.agent.run.call_args
         message_history = call_args.kwargs.get("message_history", [])
 
         # Should have the 3 previous messages as tuples
@@ -159,19 +132,8 @@ class TestChatAgentFallbackMechanism:
 class TestChatAgentRealWorldScenarios:
     """Test realistic usage scenarios without depending on LLM responses."""
 
-    @pytest.fixture
-    def chat_agent_controlled(self):
-        """Create ChatAgent with controlled responses."""
-        with patch.dict("os.environ", {"OPENAI_API_KEY": "test-key"}):
-            with patch("src.infrastructure.ai.chat_agent.Agent"):
-                with patch("src.infrastructure.ai.chat_agent.OpenAIChatModel"):
-                    agent = ChatAgent()
-                    agent.agent = MagicMock()
-                    agent.agent.run = AsyncMock()
-                    return agent
-
     @pytest.mark.asyncio
-    async def test_conversation_flow(self, chat_agent_controlled):
+    async def test_conversation_flow(self, chat_agent_with_mocked_llm):
         """Test a typical conversation flow."""
         # Simulate a conversation with controlled responses
         responses = [
@@ -188,9 +150,9 @@ class TestChatAgentRealWorldScenarios:
             # Set up mock response
             mock_result = MagicMock()
             mock_result.data = responses[i]
-            chat_agent_controlled.agent.run.return_value = mock_result
+            chat_agent_with_mocked_llm.agent.run.return_value = mock_result
 
-            response = await chat_agent_controlled.generate_response(
+            response = await chat_agent_with_mocked_llm.generate_response(
                 message=user_message,
                 conversation_context=conversation,
                 product_service=AsyncMock(),
@@ -222,12 +184,12 @@ class TestChatAgentRealWorldScenarios:
         assert len(conversation) == 6  # 3 user + 3 agent messages
 
     @pytest.mark.asyncio
-    async def test_handles_service_unavailable(self, chat_agent_controlled):
+    async def test_handles_service_unavailable(self, chat_agent_with_mocked_llm):
         """Test handling when services are unavailable."""
         # Make the LLM call fail
-        chat_agent_controlled.agent.run.side_effect = Exception("Service unavailable")
+        chat_agent_with_mocked_llm.agent.run.side_effect = Exception("Service unavailable")
 
-        response = await chat_agent_controlled.generate_response(
+        response = await chat_agent_with_mocked_llm.generate_response(
             message="Test message", product_service=None
         )
 

