@@ -135,18 +135,60 @@ class TestChatAgentRealWorldScenarios:
     @pytest.mark.asyncio
     async def test_conversation_flow(self, chat_agent_with_mocked_llm):
         """Test a typical conversation flow."""
+        # Get the appropriate greeting based on current time
+        from datetime import datetime
+        from src.infrastructure.ai.prompts.indonesian_templates import GREETING_TEMPLATES
+
+        hour = datetime.now().hour
+        if 5 <= hour < 11:
+            expected_greeting = GREETING_TEMPLATES["morning"]
+        elif 11 <= hour < 15:
+            expected_greeting = GREETING_TEMPLATES["afternoon"]
+        elif 15 <= hour < 19:
+            expected_greeting = GREETING_TEMPLATES["evening"]
+        else:
+            expected_greeting = GREETING_TEMPLATES["default"]
+
         # Simulate a conversation with controlled responses
         responses = [
-            "Selamat datang di SMS Perkasa!",
             "Kami punya berbagai jenis plat baja.",
             "Plat baja 5mm harganya Rp 125.000 per lembar.",
         ]
 
         conversation = []
 
-        for i, user_message in enumerate(
-            ["Halo", "Ada plat baja?", "Berapa harga plat 5mm?"]
-        ):
+        # First message - greeting detection
+        user_message = "Halo"
+        response = await chat_agent_with_mocked_llm.generate_response(
+            message=user_message,
+            conversation_context=conversation,
+            product_service=AsyncMock(),
+        )
+
+        # Should return template-based greeting
+        assert response == expected_greeting
+
+        conversation.append(
+            MessageDTO(
+                conversation_id="conv-1",
+                content=user_message,
+                sender_type="user",
+                session_id="test-session",
+                timestamp=None,
+            )
+        )
+        conversation.append(
+            MessageDTO(
+                conversation_id="conv-1",
+                content=response,
+                sender_type="ai_agent",
+                session_id="test-session",
+                timestamp=None,
+            )
+        )
+
+        # Subsequent messages - use LLM
+        for i, user_message in enumerate(["Ada plat baja?", "Berapa harga plat 5mm?"]):
             # Set up mock response
             mock_result = MagicMock()
             mock_result.data = responses[i]
@@ -193,6 +235,6 @@ class TestChatAgentRealWorldScenarios:
             message="Test message", product_service=None
         )
 
-        # Should return the fallback Indonesian message
+        # Should return the template-based error message
         assert "Mohon maaf" in response
-        assert "kesulitan" in response
+        assert "kesalahan sistem" in response

@@ -3,6 +3,7 @@
 import logging
 import os
 from dataclasses import dataclass
+from datetime import datetime
 from decimal import Decimal
 from typing import Any, Dict, List, Optional
 
@@ -13,6 +14,12 @@ from pydantic_ai.models.openai import OpenAIChatModel
 
 from src.application.dto import MessageDTO
 from src.application.ports import AIAgentPort, ProductServicePort
+from src.infrastructure.ai.prompts.indonesian_templates import (
+    ERROR_MESSAGES,
+    GREETING_TEMPLATES,
+    PRICE_TEMPLATES,
+    STOCK_MESSAGES,
+)
 
 # Load environment variables from .env file
 load_dotenv()
@@ -78,8 +85,35 @@ PANDUAN KOMUNIKASI:
    - Arahkan ke tim sales untuk produk custom
 6. Akhiri dengan tawaran bantuan lebih lanjut
 
+TEMPLATE RESPONSES - GUNAKAN KETIKA SESUAI:
+1. Untuk sapaan awal, gunakan variasi waktu:
+   - Pagi (05:00-10:59): "Selamat pagi! Saya PERKY..."
+   - Siang (11:00-14:59): "Selamat siang! Saya PERKY..."
+   - Sore (15:00-18:59): "Selamat sore! Saya PERKY..."
+   - Malam/Default: "Halo! Saya PERKY..."
+
+2. Untuk informasi harga varian:
+   - Format: "{display_price} per {stock_unit}"
+   - Contoh: "Rp 150.000 per lembar"
+
+3. Untuk informasi stok:
+   - Stok habis: "Mohon maaf, {variant_name} saat ini sedang kosong."
+   - Stok rendah (≤10): "Stok {variant_name} terbatas, tersisa {stock_quantity} {stock_unit}."
+   - Stok tersedia: "{variant_name} tersedia, stok {stock_quantity} {stock_unit}."
+
+4. Untuk pesan error:
+   - Varian tidak ditemukan: "Mohon maaf, {variant_spec} untuk {product_name} tidak ditemukan."
+   - Error sistem: "Maaf, saya mengalami kendala teknis. Silakan hubungi tim sales kami."
+
+CATATAN PENTING TENTANG TEMPLATES:
+- Tool responses sudah menyediakan pesan terformat di field "_formatted_stock" dan "_formatted_price"
+- GUNAKAN pesan terformat tersebut langsung dalam respons Anda
+- Jangan format ulang atau ubah pesan yang sudah terformat
+- Templates memastikan konsistensi komunikasi profesional
+
 PRINSIP PENTING:
 - SELALU gunakan data dari tools, JANGAN mengarang informasi
+- GUNAKAN template responses yang sudah terformat dari tool results
 - Bedakan dengan jelas antara produk (kategori) dan varian (item spesifik)
 - Harga dan stok HANYA ada di level varian
 - Jika tools gagal atau data tidak tersedia, jujur kepada pelanggan
@@ -93,7 +127,8 @@ LAYANAN YANG DAPAT DITAWARKAN (jika tersedia di sistem):
 - Sertifikat mill test
 
 Ingat: Kamu adalah asisten yang membantu berdasarkan data real dari sistem,
-dengan pemahaman yang jelas tentang struktur produk-varian."""
+dengan pemahaman yang jelas tentang struktur produk-varian dan penggunaan
+template responses yang konsisten."""
 
 
 @dataclass
@@ -195,11 +230,48 @@ class ChatAgent(AIAgentPort):
             model=model,
             system_prompt=SYSTEM_PROMPT,
             deps_type=ChatDependencies,
-            result_type=str,
             retries=2,
         )
 
         return agent
+
+    def _get_greeting(self) -> str:
+        """Get appropriate greeting based on time of day."""
+        hour = datetime.now().hour
+
+        if 5 <= hour < 11:
+            return GREETING_TEMPLATES["morning"]
+        elif 11 <= hour < 15:
+            return GREETING_TEMPLATES["afternoon"]
+        elif 15 <= hour < 19:
+            return GREETING_TEMPLATES["evening"]
+        else:
+            return GREETING_TEMPLATES["default"]
+
+    def _format_stock_message(self, variant: Any) -> str:
+        """Format stock information using templates."""
+        if not variant.has_stock():
+            return STOCK_MESSAGES["out_of_stock"].format(
+                variant_name=variant.variant_name
+            )
+        elif variant.stock_quantity <= 10:
+            return STOCK_MESSAGES["low_stock"].format(
+                variant_name=variant.variant_name,
+                stock_quantity=variant.stock_quantity,
+                stock_unit=variant.stock_unit,
+            )
+        else:
+            return STOCK_MESSAGES["in_stock"].format(
+                variant_name=variant.variant_name,
+                stock_quantity=variant.stock_quantity,
+                stock_unit=variant.stock_unit,
+            )
+
+    def _format_price_message(self, variant: Any) -> str:
+        """Format price information using templates."""
+        return PRICE_TEMPLATES["unit_price"].format(
+            display_price=variant.get_display_price(), stock_unit=variant.stock_unit
+        )
 
     async def _search_products_tool(
         self, ctx: RunContext[ChatDependencies], query: str
@@ -248,6 +320,12 @@ class ChatAgent(AIAgentPort):
             if product_with_variants:
                 variant = product_with_variants.get_variant_by_id(variant_id)
                 if variant:
+                    # Create base response
+                    specs = variant.specifications.copy()
+                    # Add formatted messages to specifications for LLM to use
+                    specs["_formatted_stock"] = self._format_stock_message(variant)
+                    specs["_formatted_price"] = self._format_price_message(variant)
+
                     return VariantDetails(
                         variant_id=variant.variant_id,
                         sku=variant.sku,
@@ -256,15 +334,17 @@ class ChatAgent(AIAgentPort):
                         display_price=variant.get_display_price(),
                         stock_quantity=variant.stock_quantity,
                         stock_unit=variant.stock_unit,
-                        specifications=variant.specifications,
+                        specifications=specs,
                         available=variant.has_stock(),
                     )
 
-            # Return empty variant if not found
+            # Return empty variant if not found with error message
             return VariantDetails(
                 variant_id=variant_id,
                 sku="NOT_FOUND",
-                name="Variant not found",
+                name=ERROR_MESSAGES["variant_not_found"].format(
+                    variant_spec=variant_id, product_name="Unknown"
+                ),
                 price=0.0,
                 display_price="Rp 0",
                 stock_quantity=0,
@@ -276,7 +356,7 @@ class ChatAgent(AIAgentPort):
             return VariantDetails(
                 variant_id=variant_id,
                 sku="ERROR",
-                name="Error retrieving variant",
+                name=ERROR_MESSAGES["system_error"],
                 price=0.0,
                 display_price="Rp 0",
                 stock_quantity=0,
@@ -438,7 +518,13 @@ class ChatAgent(AIAgentPort):
             )
 
     def _register_tools(self):
-        """Register tools with the agent."""
+        """Register tools with the agent.
+
+        Note: The tool functions below are decorated with @self.agent.tool,
+        which registers them with PydanticAI for dynamic invocation at runtime.
+        IDE warnings about "Function not accessed" are false positives - these
+        functions are called by the PydanticAI agent framework when needed.
+        """
 
         @self.agent.tool
         async def search_products(
@@ -565,6 +651,12 @@ class ChatAgent(AIAgentPort):
             AI-generated response in Indonesian
         """
         try:
+            # Simple greeting detection for first message
+            if not conversation_context or len(conversation_context) == 0:
+                greeting_keywords = ["halo", "hai", "pagi", "siang", "sore"]
+                if any(word in message.lower() for word in greeting_keywords):
+                    return self._get_greeting()
+
             # Build conversation history for the agent
             messages = []
             if conversation_context:
@@ -600,11 +692,8 @@ class ChatAgent(AIAgentPort):
 
         except Exception as e:
             logger.error(f"Error generating response: {e}")
-            # Fallback response in Indonesian
-            return (
-                "Mohon maaf, saya mengalami kesulitan memproses permintaan Anda. "
-                "Silakan coba lagi atau hubungi tim sales kami."
-            )
+            # Use template for error message
+            return ERROR_MESSAGES["system_error"]
 
     def _create_mock_product_service(self) -> ProductServicePort:
         """Create a mock product service for testing."""

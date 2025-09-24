@@ -104,9 +104,9 @@ class TestChatAgentErrorHandling:
             message="Test", product_service=mock_service
         )
 
-        # Should return Indonesian error message
+        # Should return Indonesian error message from template
         assert "Mohon maaf" in response
-        assert "kesulitan" in response
+        assert "kesalahan sistem" in response
 
     @pytest.mark.asyncio
     async def test_creates_mock_service_when_none_provided(
