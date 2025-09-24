@@ -69,6 +69,37 @@ def test_websocket_heartbeat(test_client):
         assert pong["type"] == "pong"
 
 
+def test_websocket_get_history(test_client):
+    """Test conversation history is sent on reconnection."""
+
+    session_id = "history-test-session"
+
+    with test_client.websocket_connect(f"/api/v1/ws/{session_id}") as websocket:
+        websocket.receive_json()
+
+        websocket.send_json({"type": "user_message", "message": "First message"})
+        websocket.receive_json()
+        response1 = websocket.receive_json()
+        assert response1["type"] == "ai_response"
+
+        websocket.send_json({"type": "user_message", "message": "Second message"})
+        websocket.receive_json()
+        response2 = websocket.receive_json()
+        assert response2["type"] == "ai_response"
+
+    with test_client.websocket_connect(f"/api/v1/ws/{session_id}") as websocket:
+        welcome = websocket.receive_json()
+        assert welcome["type"] == "system"
+        assert welcome["event"] == "connected"
+
+        websocket.send_json(
+            {"type": "user_message", "message": "Third message after reconnect"}
+        )
+        websocket.receive_json()
+        response3 = websocket.receive_json()
+        assert response3["type"] == "ai_response"
+
+
 def test_websocket_error_handling(test_client):
     """Test error handling."""
 
@@ -83,7 +114,10 @@ def test_websocket_error_handling(test_client):
         error = None
         for _ in range(5):
             msg = websocket.receive_json()
-            if msg.get("type") == "error" and "validation" in msg.get("message", "").lower():
+            if (
+                msg.get("type") == "error"
+                and "validation" in msg.get("message", "").lower()
+            ):
                 error = msg
                 break
 
