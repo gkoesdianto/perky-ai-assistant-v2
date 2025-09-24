@@ -15,6 +15,13 @@ from src.infrastructure.mocks.mock_product_repository import MockProductReposito
 from src.infrastructure.mocks.mock_query_analyzer import MockQueryAnalyzer
 from src.infrastructure.mocks.mock_ai_agent import MockAIAgent
 
+# Real implementation imports for Phase 5
+from src.infrastructure.ai.chat_agent import ChatAgent
+from src.infrastructure.repositories.in_memory_conversation_repository import (
+    InMemoryConversationRepository
+)
+from src.infrastructure.services.mock_product_service import MockProductService
+
 
 @dataclass
 class MockInfrastructureContainer:
@@ -71,19 +78,43 @@ class MockInfrastructureContainer:
 
     def _setup_real_implementations(self):
         """
-        Register real implementations.
-        To be implemented in Phase 4-5.
+        Register real implementations for Phase 5 integration.
         """
-        # Placeholder for real implementations
-        # Week 2 priorities:
-        # - Real Redis client with connection pooling
-        # - PerkyOSClient for PIM integration
-        # - PydanticAI for real AI agent
-        # - PostgreSQL with SQLAlchemy
-        raise NotImplementedError(
-            "Real implementations not yet available. "
-            "Set USE_MOCK_MODE=true to use mocks."
-        )
+        # Real implementations (Phase 5 Track 3)
+        # Note: Some still use mock/in-memory for MVP simplicity
+
+        # Redis client - for MVP, use mock with Redis-like behavior
+        self.redis_client = MockRedisClient()
+
+        # Session repository - still using mock for MVP
+        self.session_repo = MockSessionRepository()
+
+        # Conversation repository - use in-memory implementation
+        self.conversation_repo = InMemoryConversationRepository()
+
+        # Product service - using mock with realistic data
+        self.product_repo = MockProductService()
+
+        # Query analyzer - still using mock for MVP
+        self.query_analyzer = MockQueryAnalyzer()
+
+        # AI agent - use real PydanticAI implementation
+        try:
+            api_key = os.getenv("OPENAI_API_KEY")
+            if api_key:
+                self.ai_agent = ChatAgent(api_key=api_key)
+            else:
+                # Fallback to mock if no API key
+                print("Warning: No OPENAI_API_KEY found, using mock AI agent")
+                self.ai_agent = MockAIAgent()
+        except Exception as e:
+            # Fallback to mock on any error
+            print(f"Warning: Failed to initialize real ChatAgent: {e}")
+            self.ai_agent = MockAIAgent()
+
+        # Store initialization state
+        self.initialized = True
+        self.mode = "real"
 
     def get_redis_client(self):
         """

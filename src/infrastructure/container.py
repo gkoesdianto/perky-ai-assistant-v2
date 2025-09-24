@@ -3,6 +3,7 @@
 from src.infrastructure.mocks.container.mock_container import (
     MockInfrastructureContainer,
 )
+from src.infrastructure.dependencies import configure_services_for_mode
 
 
 def get_container() -> MockInfrastructureContainer:
@@ -12,9 +13,9 @@ def get_container() -> MockInfrastructureContainer:
     Returns:
         Infrastructure container with all dependencies
     """
-    # For MVP, we're using mock implementations
-    # This will be replaced with real implementations in Phase 4-5
-    return MockInfrastructureContainer(use_mocks=True)
+    # Phase 5 Track 3: Enhanced DI with real/mock mode selection
+    # Automatically determines mode from environment
+    return configure_services_for_mode()
 
 
 # Global container instance (singleton pattern)
