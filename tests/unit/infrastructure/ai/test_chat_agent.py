@@ -83,8 +83,12 @@ class TestChatAgentToolDataTransformation:
         # Use fixture from conftest instead of local fixtures
         # Test our code's ability to extract data
         assert product_with_variants.product.product_name == "Plat Baja"
-        assert len(product_with_variants.variants) == 2  # steel_plate_10mm and steel_plate_5mm
-        assert product_with_variants.get_total_stock() == 75  # 25 + 50 from the two variants
+        assert (
+            len(product_with_variants.variants) == 2
+        )  # steel_plate_10mm and steel_plate_5mm
+        assert (
+            product_with_variants.get_total_stock() == 75
+        )  # 25 + 50 from the two variants
         assert product_with_variants.has_available_stock() is True
 
 
@@ -140,6 +144,147 @@ class TestChatAgentHelpers:
         assert agent._format_rupiah(Decimal("125000")) == "Rp 125.000"
         assert agent._format_rupiah(Decimal("1250000")) == "Rp 1.250.000"
         assert agent._format_rupiah(Decimal("999")) == "Rp 999"
+
+    def test_format_stock_message_out_of_stock(self, chat_agent_with_mocked_llm):
+        """Test stock formatting for out of stock items."""
+        from src.infrastructure.ai.prompts.indonesian_templates import STOCK_MESSAGES
+
+        variant = Mock()
+        variant.variant_name = "Plat Baja 10mm"
+        variant.has_stock.return_value = False
+
+        message = chat_agent_with_mocked_llm._format_stock_message(variant)
+        expected = STOCK_MESSAGES["out_of_stock"].format(variant_name="Plat Baja 10mm")
+        assert message == expected
+
+    def test_format_stock_message_low_stock(self, chat_agent_with_mocked_llm):
+        """Test stock formatting for low stock items."""
+        from src.infrastructure.ai.prompts.indonesian_templates import STOCK_MESSAGES
+
+        variant = Mock()
+        variant.variant_name = "H-Beam 200x200"
+        variant.stock_quantity = 5
+        variant.stock_unit = "batang"
+        variant.has_stock.return_value = True
+
+        message = chat_agent_with_mocked_llm._format_stock_message(variant)
+        expected = STOCK_MESSAGES["low_stock"].format(
+            variant_name="H-Beam 200x200", stock_quantity=5, stock_unit="batang"
+        )
+        assert message == expected
+
+    def test_format_stock_message_available(self, chat_agent_with_mocked_llm):
+        """Test stock formatting for available items."""
+        from src.infrastructure.ai.prompts.indonesian_templates import STOCK_MESSAGES
+
+        variant = Mock()
+        variant.variant_name = "Besi Beton D12"
+        variant.stock_quantity = 100
+        variant.stock_unit = "batang"
+        variant.has_stock.return_value = True
+
+        message = chat_agent_with_mocked_llm._format_stock_message(variant)
+        expected = STOCK_MESSAGES["in_stock"].format(
+            variant_name="Besi Beton D12", stock_quantity=100, stock_unit="batang"
+        )
+        assert message == expected
+
+    def test_format_price_message(self, chat_agent_with_mocked_llm):
+        """Test price formatting."""
+        from src.infrastructure.ai.prompts.indonesian_templates import PRICE_TEMPLATES
+
+        variant = Mock()
+        variant.get_display_price.return_value = "Rp 1.250.000"
+        variant.stock_unit = "lembar"
+
+        message = chat_agent_with_mocked_llm._format_price_message(variant)
+        expected = PRICE_TEMPLATES["unit_price"].format(
+            display_price="Rp 1.250.000", stock_unit="lembar"
+        )
+        assert message == expected
+
+
+class TestChatAgentTemplateIntegration:
+    """Test ChatAgent Indonesian template integration."""
+
+    @pytest.mark.asyncio
+    async def test_greeting_based_on_time(self, chat_agent_with_mocked_llm):
+        """Test that greetings are selected based on time of day."""
+        from src.infrastructure.ai.prompts.indonesian_templates import (
+            GREETING_TEMPLATES,
+        )
+
+        # Test morning greeting (5-11)
+        with patch("src.infrastructure.ai.chat_agent.datetime") as mock_datetime:
+            mock_datetime.now.return_value.hour = 9
+            response = await chat_agent_with_mocked_llm.generate_response(
+                message="Halo", conversation_context=None
+            )
+            assert response == GREETING_TEMPLATES["morning"]
+
+        # Test afternoon greeting (11-15)
+        with patch("src.infrastructure.ai.chat_agent.datetime") as mock_datetime:
+            mock_datetime.now.return_value.hour = 13
+            response = await chat_agent_with_mocked_llm.generate_response(
+                message="Hai", conversation_context=None
+            )
+            assert response == GREETING_TEMPLATES["afternoon"]
+
+        # Test evening greeting (15-19)
+        with patch("src.infrastructure.ai.chat_agent.datetime") as mock_datetime:
+            mock_datetime.now.return_value.hour = 17
+            response = await chat_agent_with_mocked_llm.generate_response(
+                message="Halo PERKY", conversation_context=None
+            )
+            assert response == GREETING_TEMPLATES["evening"]
+
+    @pytest.mark.asyncio
+    async def test_greeting_only_on_first_message(self, chat_agent_with_mocked_llm):
+        """Test that greeting is only returned for first message."""
+        from src.application.dto import MessageDTO
+
+        # First message should get greeting
+        response1 = await chat_agent_with_mocked_llm.generate_response(
+            message="Halo", conversation_context=None
+        )
+        assert "Selamat" in response1
+        assert "PERKY" in response1 or "SMS Perkasa" in response1
+
+        # Subsequent message should use LLM
+        mock_response = MagicMock()
+        mock_response.data = "Saya akan membantu Anda"
+        chat_agent_with_mocked_llm.agent.run.return_value = mock_response
+
+        context = [
+            MessageDTO(
+                conversation_id="conv-1",
+                content="Halo",
+                sender_type="user",
+                session_id="test",
+                timestamp=None,
+            )
+        ]
+
+        response2 = await chat_agent_with_mocked_llm.generate_response(
+            message="Ada plat baja?", conversation_context=context
+        )
+        assert response2 == "Saya akan membantu Anda"
+
+    @pytest.mark.asyncio
+    async def test_error_message_uses_template(self, chat_agent_with_mocked_llm):
+        """Test that errors use Indonesian templates."""
+        from src.infrastructure.ai.prompts.indonesian_templates import ERROR_MESSAGES
+
+        # Force an error in the agent
+        chat_agent_with_mocked_llm.agent.run.side_effect = Exception("API Error")
+
+        response = await chat_agent_with_mocked_llm.generate_response(
+            message="Test error", conversation_context=None
+        )
+
+        assert response == ERROR_MESSAGES["system_error"]
+        assert "Mohon maaf" in response
+        assert "kesalahan sistem" in response
 
 
 class TestChatDependencies:

@@ -64,6 +64,11 @@ addopts = [
     "--cov-report=term-missing",
     "--cov-report=html",
 ]
+markers = [
+    "mvp: MVP requirement tests that must pass",
+    "performance: Performance and load tests",
+    "load: Load testing scenarios",
+]
 
 [tool.coverage.run]
 source = ["src"]

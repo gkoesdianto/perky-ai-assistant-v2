@@ -376,22 +376,23 @@ class VariantInfoFactory(BaseFactory[VariantInfo]):
     @classmethod
     def create_from_cache(cls, **kwargs) -> VariantInfo:
         """Create a variant marked as from cache."""
-        defaults = {
-            "source": "cache",
-            "sku": f"CACHE-{uuid.uuid4().hex[:8]}"
-        }
+        defaults = {"source": "cache", "sku": f"CACHE-{uuid.uuid4().hex[:8]}"}
         defaults.update(kwargs)
         return cls.create(**defaults)
 
     @classmethod
-    def create_with_specifications(cls, specifications: Dict[str, Any], **kwargs) -> VariantInfo:
+    def create_with_specifications(
+        cls, specifications: Dict[str, Any], **kwargs
+    ) -> VariantInfo:
         """Create a variant with specific specifications."""
         defaults = {"specifications": specifications}
         defaults.update(kwargs)
         return cls.create(**defaults)
 
     @classmethod
-    def create_hollow_variant(cls, material: str = "hitam", dimensions: str = "40x40", **kwargs) -> VariantInfo:
+    def create_hollow_variant(
+        cls, material: str = "hitam", dimensions: str = "40x40", **kwargs
+    ) -> VariantInfo:
         """Create a hollow variant with specific material and dimensions."""
         defaults = {
             "variant_id": f"var_hollow_{material}_{dimensions.replace('x', '_')}",

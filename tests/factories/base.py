@@ -4,7 +4,8 @@ from typing import TypeVar, Generic, Dict, Any, List, Callable
 import uuid
 from datetime import datetime, timezone
 
-T = TypeVar('T')
+T = TypeVar("T")
+
 
 class BaseFactory(Generic[T]):
     """Base factory for creating test instances with presets.
@@ -41,7 +42,7 @@ class BaseFactory(Generic[T]):
     def _get_defaults(cls) -> Dict[str, Any]:
         """Get default values for instance creation."""
         return {
-            'id': f"{cls.__name__.lower()}-{uuid.uuid4().hex[:8]}",
-            'created_at': datetime.now(timezone.utc),
-            'updated_at': datetime.now(timezone.utc),
+            "id": f"{cls.__name__.lower()}-{uuid.uuid4().hex[:8]}",
+            "created_at": datetime.now(timezone.utc),
+            "updated_at": datetime.now(timezone.utc),
         }
