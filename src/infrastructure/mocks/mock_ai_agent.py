@@ -1,10 +1,11 @@
+import os
 import random
 import re
-import os
-from typing import List, Optional, Dict, Any
 from dataclasses import dataclass
-from src.application.ports import AIAgentPort
+from typing import Any, Dict, List, Optional
+
 from src.application.dto import MessageDTO
+from src.application.ports import AIAgentPort
 from src.infrastructure.mocks.mock_error_simulator import MockErrorSimulator
 
 
@@ -17,7 +18,6 @@ class ResponseMetadata:
 
 
 class MockAIAgent(AIAgentPort):
-
     def __init__(self):
         self.last_response_metadata: Optional[ResponseMetadata] = None
 
@@ -142,8 +142,14 @@ class MockAIAgent(AIAgentPort):
     def _is_product_inquiry(self, message: str) -> bool:
         """Check if message is asking about specific products."""
         product_keywords = [
-            "plat", "hollow", "beam", "pipa",
-            "besi", "baja", "steel", "material"
+            "plat",
+            "hollow",
+            "beam",
+            "pipa",
+            "besi",
+            "baja",
+            "steel",
+            "material",
         ]
         return any(word in message for word in product_keywords)
 
@@ -299,14 +305,15 @@ class MockAIAgent(AIAgentPort):
             base = random.choice(prices)
         else:
             # Provide generic price response with contact info
-            base = random.choice([
-                "Untuk informasi harga terbaru, "
-                "silakan hubungi tim sales kami",
-                "Harga bervariasi tergantung spesifikasi. "
-                "Hubungi kami untuk penawaran terbaik",
-                "Kami berikan harga kompetitif. "
-                "Silakan kontak sales untuk detail"
-            ])
+            base = random.choice(
+                [
+                    "Untuk informasi harga terbaru, " "silakan hubungi tim sales kami",
+                    "Harga bervariasi tergantung spesifikasi. "
+                    "Hubungi kami untuk penawaran terbaik",
+                    "Kami berikan harga kompetitif. "
+                    "Silakan kontak sales untuk detail",
+                ]
+            )
 
         if random.random() > 0.5:
             extras = [
@@ -500,10 +507,7 @@ class MockAIAgent(AIAgentPort):
         return random.choice(
             [
                 "Mohon maaf, bisa dijelaskan lebih detail kebutuhan Anda?",
-                (
-                    "Saya perlu informasi lebih spesifik. "
-                    "Produk apa yang Anda cari?"
-                ),
+                ("Saya perlu informasi lebih spesifik. " "Produk apa yang Anda cari?"),
                 "Bisa tolong diperjelas pertanyaan atau kebutuhan Anda?",
             ]
         )
