@@ -1,9 +1,9 @@
 """Infrastructure container for dependency injection."""
 
+from src.infrastructure.dependencies import configure_services_for_mode
 from src.infrastructure.mocks.container.mock_container import (
     MockInfrastructureContainer,
 )
-from src.infrastructure.dependencies import configure_services_for_mode
 
 
 def get_container() -> MockInfrastructureContainer:
@@ -33,6 +33,16 @@ def get_singleton_container() -> MockInfrastructureContainer:
     if _container is None:
         _container = get_container()
     return _container
+
+
+def reset_singleton_container() -> None:
+    """
+    Reset the singleton container instance.
+
+    This should be called between tests to ensure clean state.
+    """
+    global _container
+    _container = None
 
 
 # Create convenience properties for the container

@@ -1,0 +1,235 @@
+# Test Environment Configuration
+# This file defines environment-specific settings for different test types
+
+# Default test configuration (inherited by all environments)
+default:
+  # Database settings
+  database:
+    pool_size: 5
+    pool_timeout: 30
+    echo_sql: false
+    use_transactions: true
+
+  # Redis settings
+  redis:
+    db_number: 15  # Use separate DB for tests
+    max_connections: 10
+    socket_timeout: 5
+    decode_responses: true
+
+  # Test execution settings
+  timeouts:
+    default: 10.0
+    async: 30.0
+    websocket: 5.0
+    http_request: 10.0
+
+  # Feature flags
+  features:
+    performance_monitoring: false
+    coverage_tracking: true
+    test_isolation: true
+    parallel_execution: false
+    verbose_logging: false
+
+  # External services
+  services:
+    mock_external: true
+    stub_ai_responses: true
+    use_test_database: true
+    use_test_redis: true
+
+# Unit test environment
+unit:
+  inherit: default
+
+  database:
+    use_memory: true  # SQLite in-memory
+
+  redis:
+    use_mock: true  # Mock Redis client
+
+  features:
+    test_isolation: true
+    parallel_execution: true
+
+  services:
+    mock_external: true
+    stub_ai_responses: true
+
+# Integration test environment
+integration:
+  inherit: default
+
+  database:
+    url_suffix: "_test"  # Append to database name
+    pool_size: 10
+
+  redis:
+    db_number: 14  # Different DB for integration
+
+  timeouts:
+    default: 20.0
+    async: 60.0
+
+  features:
+    test_isolation: true
+    parallel_execution: false
+
+  services:
+    mock_external: true
+    stub_ai_responses: false  # Use real AI for integration
+
+# E2E test environment
+e2e:
+  inherit: default
+
+  database:
+    url_suffix: "_e2e"
+    pool_size: 20
+    echo_sql: true  # Debug SQL for E2E
+
+  redis:
+    db_number: 13  # Different DB for E2E
+    max_connections: 20
+
+  timeouts:
+    default: 30.0
+    async: 90.0
+    websocket: 30.0
+    http_request: 30.0
+
+  features:
+    performance_monitoring: true
+    test_isolation: false  # E2E tests may share state
+    parallel_execution: false
+    verbose_logging: true
+
+  services:
+    mock_external: false  # Use real services
+    stub_ai_responses: false
+    use_test_database: true
+    use_test_redis: true
+
+# Performance test environment
+performance:
+  inherit: default
+
+  database:
+    url_suffix: "_perf"
+    pool_size: 50  # Large pool for load testing
+    pool_timeout: 60
+    echo_sql: false  # Disable SQL logging for performance
+
+  redis:
+    db_number: 12
+    max_connections: 50
+
+  timeouts:
+    default: 60.0
+    async: 120.0
+    websocket: 60.0
+    http_request: 60.0
+
+  features:
+    performance_monitoring: true
+    coverage_tracking: false  # Disable coverage for performance
+    test_isolation: false
+    parallel_execution: true  # Parallel load generation
+    verbose_logging: false  # Minimal logging for performance
+
+  services:
+    mock_external: false
+    stub_ai_responses: false
+    use_test_database: true
+    use_test_redis: true
+
+# CI/CD test environment
+ci:
+  inherit: default
+
+  database:
+    url_env: "CI_DATABASE_URL"  # Use CI-provided database
+    pool_size: 10
+
+  redis:
+    url_env: "CI_REDIS_URL"  # Use CI-provided Redis
+    db_number: 0
+
+  timeouts:
+    default: 20.0
+    async: 60.0
+
+  features:
+    performance_monitoring: true
+    coverage_tracking: true
+    test_isolation: true
+    parallel_execution: true
+    verbose_logging: true
+
+  services:
+    mock_external: true  # Mock external services in CI
+    stub_ai_responses: true
+    use_test_database: true
+    use_test_redis: true
+
+# Local development environment
+local:
+  inherit: default
+
+  database:
+    url: "postgresql://localhost/perky_test"
+    pool_size: 5
+    echo_sql: true
+
+  redis:
+    url: "redis://localhost:6379"
+    db_number: 15
+
+  timeouts:
+    default: 30.0
+    async: 90.0
+
+  features:
+    performance_monitoring: false
+    coverage_tracking: true
+    test_isolation: true
+    parallel_execution: false
+    verbose_logging: true
+
+  services:
+    mock_external: false  # Use real services locally
+    stub_ai_responses: false
+    use_test_database: true
+    use_test_redis: true
+
+# Staging environment (pre-production testing)
+staging:
+  inherit: default
+
+  database:
+    url_env: "STAGING_DATABASE_URL"
+    pool_size: 20
+    echo_sql: false
+
+  redis:
+    url_env: "STAGING_REDIS_URL"
+    db_number: 0
+
+  timeouts:
+    default: 20.0
+    async: 60.0
+    websocket: 20.0
+
+  features:
+    performance_monitoring: true
+    coverage_tracking: false
+    test_isolation: false
+    parallel_execution: false
+    verbose_logging: false
+
+  services:
+    mock_external: false
+    stub_ai_responses: false
+    use_test_database: false  # Use staging database
+    use_test_redis: false  # Use staging Redis
