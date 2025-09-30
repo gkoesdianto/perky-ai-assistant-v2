@@ -134,16 +134,13 @@ class TestChatAgentErrorHandling:
 class TestChatAgentHelpers:
     """Test helper methods - these are deterministic and should be tested."""
 
-    @patch("src.infrastructure.ai.chat_agent.OpenAIChatModel")
-    @patch("src.infrastructure.ai.chat_agent.Agent")
-    @patch.dict("os.environ", {"OPENAI_API_KEY": "test-key"})
-    def test_format_rupiah(self, mock_agent, mock_model):
+    def test_format_rupiah(self):
         """Test Rupiah formatting helper."""
-        agent = ChatAgent()
+        from src.core.formatting import format_rupiah
 
-        assert agent._format_rupiah(Decimal("125000")) == "Rp 125.000"
-        assert agent._format_rupiah(Decimal("1250000")) == "Rp 1.250.000"
-        assert agent._format_rupiah(Decimal("999")) == "Rp 999"
+        assert format_rupiah(Decimal("125000")) == "Rp 125.000"
+        assert format_rupiah(Decimal("1250000")) == "Rp 1.250.000"
+        assert format_rupiah(Decimal("999")) == "Rp 999"
 
     def test_format_stock_message_out_of_stock(self, chat_agent_with_mocked_llm):
         """Test stock formatting for out of stock items."""

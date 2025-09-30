@@ -8,10 +8,11 @@ Tests verify that:
 5. Error messages follow template patterns
 """
 
-import pytest
 from datetime import datetime
 from decimal import Decimal
 from unittest.mock import Mock, patch
+
+import pytest
 
 from src.domain.value_objects.variant_info import VariantInfo
 from src.infrastructure.ai.chat_agent import ChatAgent
@@ -239,6 +240,7 @@ class TestTemplateIntegrationInTools:
 
         # Mock service
         from unittest.mock import AsyncMock
+
         mock_service = Mock()
         mock_service.get_product_with_variants = AsyncMock(return_value=mock_product)
 

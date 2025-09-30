@@ -20,12 +20,8 @@ GREETING_TEMPLATES = {
         "Selamat siang! Terima kasih telah menghubungi SMS Perkasa. "
         "Produk baja apa yang Anda cari?"
     ),
-    "evening": (
-        "Selamat sore! Saya PERKY, siap membantu kebutuhan produk baja Anda."
-    ),
-    "default": (
-        "Selamat datang di SMS Perkasa! Saya PERKY, asisten produk baja Anda."
-    ),
+    "evening": ("Selamat sore! Saya PERKY, siap membantu kebutuhan produk baja Anda."),
+    "default": ("Selamat datang di SMS Perkasa! Saya PERKY, asisten produk baja Anda."),
 }
 
 PRODUCT_INQUIRY_TEMPLATES = {
@@ -33,19 +29,14 @@ PRODUCT_INQUIRY_TEMPLATES = {
         "Baik, saya akan cek ketersediaan varian {variant_name} untuk Anda."
     ),
     "specifications": "Berikut spesifikasi lengkap untuk {variant_name}:",
-    "pricing": (
-        "Untuk {variant_name}, harga per {stock_unit}: {display_price}"
-    ),
+    "pricing": ("Untuk {variant_name}, harga per {stock_unit}: {display_price}"),
     "pricing_inquiry": (
         "Produk {product_name} memiliki beberapa varian. "
         "Varian mana yang Anda butuhkan?"
     ),
-    "variant_options": (
-        "Produk {product_name} tersedia dalam {variant_count} varian:"
-    ),
+    "variant_options": ("Produk {product_name} tersedia dalam {variant_count} varian:"),
     "variant_list": (
-        "- {variant_name}: {display_price} per {stock_unit} "
-        "(Stok: {stock_quantity})"
+        "- {variant_name}: {display_price} per {stock_unit} " "(Stok: {stock_quantity})"
     ),
     "recommendation": (
         "Berdasarkan kebutuhan Anda, saya merekomendasikan produk berikut:"
@@ -87,20 +78,16 @@ ERROR_MESSAGES = {
         "Maaf, produk {product_name} tidak ditemukan dalam katalog kami."
     ),
     "variant_not_found": (
-        "Maaf, varian {variant_spec} tidak tersedia untuk produk "
-        "{product_name}."
+        "Maaf, varian {variant_spec} tidak tersedia untuk produk " "{product_name}."
     ),
     "variant_out_of_stock": (
-        "Mohon maaf, stok {variant_name} sedang kosong. "
-        "Estimasi tersedia {date}."
+        "Mohon maaf, stok {variant_name} sedang kosong. " "Estimasi tersedia {date}."
     ),
     "insufficient_stock": (
-        "Stok {variant_name} tidak mencukupi. "
-        "Tersedia: {available} {stock_unit}"
+        "Stok {variant_name} tidak mencukupi. " "Tersedia: {available} {stock_unit}"
     ),
     "system_error": (
-        "Mohon maaf, terjadi kesalahan sistem. "
-        "Tim kami akan segera memperbaikinya."
+        "Mohon maaf, terjadi kesalahan sistem. " "Tim kami akan segera memperbaikinya."
     ),
     "clarification": (
         "Mohon maaf, saya perlu informasi lebih detail. "
@@ -149,7 +136,6 @@ CLOSING_TEMPLATES = {
     ),
     "need_help": "Ada yang bisa saya bantu lagi?",
     "thank_you": (
-        "Terima kasih telah menghubungi SMS Perkasa. "
-        "Semoga hari Anda menyenangkan!"
+        "Terima kasih telah menghubungi SMS Perkasa. " "Semoga hari Anda menyenangkan!"
     ),
 }

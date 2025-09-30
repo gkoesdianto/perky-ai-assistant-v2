@@ -1,10 +1,10 @@
 """Circuit breaker pattern for WebSocket service resilience."""
 
+import asyncio
+import logging
 from datetime import datetime, timedelta
 from enum import Enum
 from typing import Any, Callable, Optional
-import asyncio
-import logging
 
 logger = logging.getLogger(__name__)
 

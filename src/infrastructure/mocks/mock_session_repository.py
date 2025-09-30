@@ -1,7 +1,8 @@
 """Mock Session Repository implementation."""
 
-from typing import Dict, Optional
 from datetime import datetime
+from typing import Dict, Optional
+
 from src.domain.entities.session import Session
 
 

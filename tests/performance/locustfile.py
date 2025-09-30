@@ -377,9 +377,12 @@ def on_test_start(environment, **kwargs):
     """Called when test starts."""
     logger.info("Performance test starting...")
     logger.info(f"Target host: {environment.host}")
-    logger.info(
-        f"Total users: {environment.parsed_options.num_users if environment.parsed_options else 'Not set'}"
+    num_users = (
+        environment.parsed_options.num_users
+        if environment.parsed_options
+        else "Not set"
     )
+    logger.info(f"Total users: {num_users}")
 
 
 @events.test_stop.add_listener

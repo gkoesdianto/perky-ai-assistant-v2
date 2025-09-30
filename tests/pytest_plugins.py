@@ -139,7 +139,8 @@ class CategoryPlugin:
         # Check category inclusion
         if self.category_filter and test_category != self.category_filter:
             pytest.skip(
-                f"Category '{test_category}' doesn't match filter '{self.category_filter}'"
+                f"Category '{test_category}' doesn't match filter "
+                f"'{self.category_filter}'"
             )
 
         # Check category exclusion
@@ -375,5 +376,6 @@ def pytest_terminal_summary(terminalreporter, exitstatus, config):
                 total = sum(stats.values())
                 terminalreporter.write_line(
                     f"  {priority.capitalize()}: {total} tests "
-                    f"(✓ {stats['passed']} / ✗ {stats['failed']} / ⊘ {stats['skipped']})"
+                    f"(✓ {stats['passed']} / ✗ {stats['failed']} / "
+                    f"⊘ {stats['skipped']})"
                 )

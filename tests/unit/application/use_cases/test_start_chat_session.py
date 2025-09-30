@@ -162,9 +162,7 @@ class TestStartChatSessionUseCaseImpl:
         assert stored_value is not None  # Key exists with correct format
 
     @pytest.mark.asyncio
-    async def test_ttl_is_set_correctly(
-        self, use_case, mock_redis_client
-    ):
+    async def test_ttl_is_set_correctly(self, use_case, mock_redis_client):
         """Test that TTL is set to 3600 seconds (1 hour) for new sessions."""
         # Arrange
         session_id = "ttl-test"

@@ -179,6 +179,5 @@ class TestChatAgentRealWorldScenarios:
 
         with pytest.raises(Exception, match="Simulated failure"):
             await agent.generate_response(
-                message="Test message",
-                conversation_context=None
+                message="Test message", conversation_context=None
             )

@@ -1,14 +1,14 @@
 """Get Conversation Use Case Implementation"""
 
-from typing import Optional
 import logging
+from typing import Optional
 
-from src.application.use_cases.interfaces import GetConversationUseCase
 from src.application.dto.conversation_dto import ConversationDTO
 from src.application.dto.message_dto import MessageDTO
 from src.application.ports.conversation_repository_port import (
     ConversationRepositoryPort,
 )
+from src.application.use_cases.interfaces import GetConversationUseCase
 
 logger = logging.getLogger(__name__)
 
@@ -61,7 +61,8 @@ class GetConversationUseCaseImpl(GetConversationUseCase):
             )
 
             logger.info(
-                f"Retrieved conversation {conversation.id} with {len(messages)} messages"
+                f"Retrieved conversation {conversation.id} "
+                f"with {len(messages)} messages"
             )
 
             return conversation_dto

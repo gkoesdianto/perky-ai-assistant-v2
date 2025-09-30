@@ -1,18 +1,18 @@
 """Mock Conversation Repository implementation for MVP testing
 
-This module provides an in-memory conversation repository with thread-safe operations
-and automatic cleanup of expired conversations, following the Phase 3 Mock Infrastructure
-Implementation Specification.
+This module provides an in-memory conversation repository with
+thread-safe operations and automatic cleanup of expired conversations,
+following the Phase 3 Mock Infrastructure Implementation Specification.
 """
 
 import asyncio
 from datetime import datetime, timedelta, timezone
-from typing import Optional, Dict
+from typing import Dict, Optional
 
-from src.domain.entities.conversation import Conversation
 from src.application.ports.conversation_repository_port import (
     ConversationRepositoryPort,
 )
+from src.domain.entities.conversation import Conversation
 
 
 class MockConversationRepository(ConversationRepositoryPort):

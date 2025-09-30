@@ -1,5 +1,5 @@
-from typing import Optional, Dict, List, Any
 from asyncio import Lock
+from typing import Any, Dict, List, Optional
 
 from src.domain.entities.conversation import Conversation
 from src.domain.entities.message import Message

@@ -5,12 +5,15 @@ and automatic cleanup of expired conversations.
 """
 
 import asyncio
-import pytest
 from datetime import datetime, timedelta, timezone
 
-from src.infrastructure.mocks.mock_conversation_repository import MockConversationRepository
+import pytest
+
 from src.domain.entities.conversation import Conversation
 from src.domain.entities.message import Message
+from src.infrastructure.mocks.mock_conversation_repository import (
+    MockConversationRepository,
+)
 
 # Import factories from the consolidated test infrastructure
 from tests.factories import ConversationFactory, MessageFactory
@@ -27,19 +30,19 @@ def sample_conversation():
     """Create a sample conversation using factory."""
     conversation = ConversationFactory.create(
         session_id="test-session-123",
-        metadata={"user_id": "user-456", "channel": "web"}
+        metadata={"user_id": "user-456", "channel": "web"},
     )
 
     # Add some messages using factory
     message1 = MessageFactory.create(
         content="Hello, I need help with steel products",
         sender_type="user",
-        conversation_id=conversation.id
+        conversation_id=conversation.id,
     )
     message2 = MessageFactory.create(
         content="I can help you with steel products. What are you looking for?",
         sender_type="ai_agent",
-        conversation_id=conversation.id
+        conversation_id=conversation.id,
     )
 
     conversation.add_message(message1)
@@ -53,7 +56,7 @@ def expired_conversation():
     """Create an expired conversation (last activity > 1 hour ago)."""
     conversation = ConversationFactory.create(
         session_id="expired-session-789",
-        metadata={"user_id": "user-old", "channel": "api"}
+        metadata={"user_id": "user-old", "channel": "api"},
     )
 
     # Manually set last_activity to 2 hours ago
@@ -66,7 +69,9 @@ class TestMockConversationRepository:
     """Test suite for MockConversationRepository."""
 
     @pytest.mark.asyncio
-    async def test_save_and_retrieve_conversation(self, repository, sample_conversation):
+    async def test_save_and_retrieve_conversation(
+        self, repository, sample_conversation
+    ):
         """Test saving and retrieving a conversation."""
         # Save conversation
         await repository.save(sample_conversation)
@@ -96,7 +101,7 @@ class TestMockConversationRepository:
         new_message = MessageFactory.create(
             content="I need plat baja 5mm",
             sender_type="user",
-            conversation_id=sample_conversation.id
+            conversation_id=sample_conversation.id,
         )
         sample_conversation.add_message(new_message)
 
@@ -133,21 +138,29 @@ class TestMockConversationRepository:
         await repository.delete("nonexistent-session")
 
     @pytest.mark.asyncio
-    async def test_cleanup_expired_conversations(self, repository, sample_conversation, expired_conversation):
+    async def test_cleanup_expired_conversations(
+        self, repository, sample_conversation, expired_conversation
+    ):
         """Test cleanup of expired conversations."""
         # Save both conversations
         await repository.save(sample_conversation)
         await repository.save(expired_conversation)
 
         # Verify both exist
-        assert await repository.get_by_session(sample_conversation.session_id) is not None
-        assert await repository.get_by_session(expired_conversation.session_id) is not None
+        assert (
+            await repository.get_by_session(sample_conversation.session_id) is not None
+        )
+        assert (
+            await repository.get_by_session(expired_conversation.session_id) is not None
+        )
 
         # Run cleanup (default 1 hour)
         await repository.cleanup_expired()
 
         # Verify active conversation still exists
-        assert await repository.get_by_session(sample_conversation.session_id) is not None
+        assert (
+            await repository.get_by_session(sample_conversation.session_id) is not None
+        )
 
         # Verify expired conversation is removed
         assert await repository.get_by_session(expired_conversation.session_id) is None
@@ -160,7 +173,9 @@ class TestMockConversationRepository:
         recent.last_activity = datetime.now(timezone.utc) - timedelta(minutes=30)
 
         one_hour_old = ConversationFactory.create(session_id="one-hour")
-        one_hour_old.last_activity = datetime.now(timezone.utc) - timedelta(hours=1, minutes=30)
+        one_hour_old.last_activity = datetime.now(timezone.utc) - timedelta(
+            hours=1, minutes=30
+        )
 
         three_hours_old = ConversationFactory.create(session_id="three-hours")
         three_hours_old.last_activity = datetime.now(timezone.utc) - timedelta(hours=3)
@@ -183,17 +198,12 @@ class TestMockConversationRepository:
         """Test thread-safety during concurrent save operations."""
         # Create multiple conversations using factory
         conversations = [
-            ConversationFactory.create(
-                session_id=f"session-{i}",
-                metadata={"index": i}
-            )
+            ConversationFactory.create(session_id=f"session-{i}", metadata={"index": i})
             for i in range(10)
         ]
 
         # Save them concurrently
-        await asyncio.gather(*[
-            repository.save(conv) for conv in conversations
-        ])
+        await asyncio.gather(*[repository.save(conv) for conv in conversations])
 
         # Verify all were saved
         for conv in conversations:
@@ -202,16 +212,20 @@ class TestMockConversationRepository:
             assert retrieved.metadata["index"] == conv.metadata["index"]
 
     @pytest.mark.asyncio
-    async def test_thread_safety_concurrent_reads(self, repository, sample_conversation):
+    async def test_thread_safety_concurrent_reads(
+        self, repository, sample_conversation
+    ):
         """Test thread-safety during concurrent read operations."""
         # Save a conversation
         await repository.save(sample_conversation)
 
         # Read it concurrently multiple times
-        results = await asyncio.gather(*[
-            repository.get_by_session(sample_conversation.session_id)
-            for _ in range(10)
-        ])
+        results = await asyncio.gather(
+            *[
+                repository.get_by_session(sample_conversation.session_id)
+                for _ in range(10)
+            ]
+        )
 
         # Verify all reads returned the same conversation
         for result in results:
@@ -223,8 +237,7 @@ class TestMockConversationRepository:
         """Test thread-safety with mixed concurrent operations."""
         # Initial conversations using factory
         initial_convs = [
-            ConversationFactory.create(session_id=f"init-{i}")
-            for i in range(3)
+            ConversationFactory.create(session_id=f"init-{i}") for i in range(3)
         ]
 
         # Save initial conversations
@@ -262,7 +275,9 @@ class TestMockConversationRepository:
         # Verify state after operations
         assert await repository.get_by_session("init-0") is None  # Deleted
         assert await repository.get_by_session("init-1") is not None  # Still exists
-        assert await repository.get_by_session("new-3") is not None  # New conversation saved
+        assert (
+            await repository.get_by_session("new-3") is not None
+        )  # New conversation saved
 
     @pytest.mark.asyncio
     async def test_multiple_conversations_different_sessions(self, repository):
@@ -271,8 +286,7 @@ class TestMockConversationRepository:
         conversations = []
         for i in range(5):
             conv = ConversationFactory.create(
-                session_id=f"session-{i}",
-                metadata={"user_id": f"user-{i}", "index": i}
+                session_id=f"session-{i}", metadata={"user_id": f"user-{i}", "index": i}
             )
             conversations.append(conv)
             await repository.save(conv)
@@ -306,7 +320,7 @@ class TestMockConversationRepository:
             message = MessageFactory.create(
                 content=f"Message {i}",
                 sender_type="user" if i % 2 == 0 else "ai_agent",
-                conversation_id=conversation.id
+                conversation_id=conversation.id,
             )
             conversation.add_message(message)
 
@@ -335,8 +349,10 @@ class TestMockConversationRepository:
         results = await asyncio.gather(
             repository.cleanup_expired(),
             repository.get_by_session("active"),
-            repository.save(ConversationFactory.create(session_id="new-during-cleanup")),
-            return_exceptions=True
+            repository.save(
+                ConversationFactory.create(session_id="new-during-cleanup")
+            ),
+            return_exceptions=True,
         )
 
         # Verify no exceptions

@@ -1,15 +1,16 @@
-"""Unit tests for Conversation entity focusing on message management and context retrieval."""
+"""Unit tests for Conversation entity: message management and context."""
+
+import threading
+import time
+from concurrent.futures import ThreadPoolExecutor
+from datetime import datetime, timedelta, timezone
+from typing import Any, Dict, List
 
 import pytest
-from datetime import datetime, timezone, timedelta
-from typing import List, Dict, Any
-import time
-import threading
-from concurrent.futures import ThreadPoolExecutor
 
+from src.domain.entities.base import BaseEntity
 from src.domain.entities.conversation import Conversation
 from src.domain.entities.message import Message
-from src.domain.entities.base import BaseEntity
 from tests.factories import ConversationFactory, MessageFactory
 
 

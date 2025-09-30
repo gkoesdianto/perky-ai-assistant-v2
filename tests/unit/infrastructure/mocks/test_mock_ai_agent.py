@@ -1,11 +1,12 @@
-import pytest
-from src.infrastructure.mocks.mock_ai_agent import MockAIAgent
-from src.application.dto import MessageDTO
 from datetime import datetime, timezone
+
+import pytest
+
+from src.application.dto import MessageDTO
+from src.infrastructure.mocks.mock_ai_agent import MockAIAgent
 
 
 class TestMockAIAgent:
-
     @pytest.fixture
     def mock_agent(self):
         return MockAIAgent()
@@ -35,7 +36,10 @@ class TestMockAIAgent:
         for greeting in greetings:
             response = await mock_agent.generate_response(greeting)
             # LLM-like responses should contain greeting indicators
-            assert any(term in response.lower() for term in ["selamat", "perky", "sms perkasa", "bantu", "halo", "kami"])
+            assert any(
+                term in response.lower()
+                for term in ["selamat", "perky", "sms perkasa", "bantu", "halo", "kami"]
+            )
             # Should have metadata tracking
             assert mock_agent.last_response_metadata is not None
             assert mock_agent.last_response_metadata.intent == "greeting"
@@ -48,9 +52,15 @@ class TestMockAIAgent:
         for query in queries:
             response = await mock_agent.generate_response(query)
             # LLM-like responses should mention plat or related terms
-            assert any(term in response.lower() for term in ["plat", "baja", "tersedia", "stock", "ready"])
+            assert any(
+                term in response.lower()
+                for term in ["plat", "baja", "tersedia", "stock", "ready"]
+            )
             # Verify intent detection
-            assert mock_agent.last_response_metadata.intent in ["product_inquiry", "stock_check"]
+            assert mock_agent.last_response_metadata.intent in [
+                "product_inquiry",
+                "stock_check",
+            ]
 
     @pytest.mark.asyncio
     async def test_product_hollow_inquiry(self, mock_agent):
@@ -59,10 +69,27 @@ class TestMockAIAgent:
 
         for query in queries:
             response = await mock_agent.generate_response(query)
-            # LLM-like responses should contain hollow-related content or general product response
-            assert any(term in response.lower() for term in ["hollow", "besi", "galvanis", "tersedia", "ukuran", "20x20", "40x40", "stock", "produk", "material"])
+            # LLM-like responses should contain hollow-related content
+            # or general product response
+            assert any(
+                term in response.lower()
+                for term in [
+                    "hollow",
+                    "besi",
+                    "galvanis",
+                    "tersedia",
+                    "ukuran",
+                    "20x20",
+                    "40x40",
+                    "stock",
+                    "produk",
+                    "material",
+                ]
+            )
             # Check entity extraction
-            assert "hollow" in mock_agent.last_response_metadata.entities.get("products", [])
+            assert "hollow" in mock_agent.last_response_metadata.entities.get(
+                "products", []
+            )
 
     @pytest.mark.asyncio
     async def test_price_inquiry(self, mock_agent):
@@ -72,7 +99,18 @@ class TestMockAIAgent:
         for query in queries:
             response = await mock_agent.generate_response(query)
             # Should contain price information or ask for clarification
-            assert any(term in response.lower() for term in ["rp", "harga", "biaya", "price", "penawaran", "spesifik", "produk"])
+            assert any(
+                term in response.lower()
+                for term in [
+                    "rp",
+                    "harga",
+                    "biaya",
+                    "price",
+                    "penawaran",
+                    "spesifik",
+                    "produk",
+                ]
+            )
 
     @pytest.mark.asyncio
     async def test_stock_availability(self, mock_agent):
@@ -84,7 +122,16 @@ class TestMockAIAgent:
             # Should contain stock information or availability
             assert any(
                 term in response.lower()
-                for term in ["stok", "stock", "tersedia", "ready", "lembar", "batang", "produk", "siap"]
+                for term in [
+                    "stok",
+                    "stock",
+                    "tersedia",
+                    "ready",
+                    "lembar",
+                    "batang",
+                    "produk",
+                    "siap",
+                ]
             )
 
     @pytest.mark.asyncio
@@ -95,14 +142,37 @@ class TestMockAIAgent:
         for query in queries:
             response = await mock_agent.generate_response(query)
             # LLM-like responses for ordering vary
-            assert any(term in response.lower() for term in ["pemesanan", "spesifikasi", "pesan", "order", "hubungi", "sales", "konfirmasi", "produk"])
+            assert any(
+                term in response.lower()
+                for term in [
+                    "pemesanan",
+                    "spesifikasi",
+                    "pesan",
+                    "order",
+                    "hubungi",
+                    "sales",
+                    "konfirmasi",
+                    "produk",
+                ]
+            )
 
     @pytest.mark.asyncio
     async def test_default_response(self, mock_agent):
         # Test unrecognized queries
         response = await mock_agent.generate_response("random unrelated text")
         # LLM-like responses should ask for clarification
-        assert any(term in response.lower() for term in ["maaf", "informasi", "spesifik", "kebutuhan", "produk", "cari", "jelaskan"])
+        assert any(
+            term in response.lower()
+            for term in [
+                "maaf",
+                "informasi",
+                "spesifik",
+                "kebutuhan",
+                "produk",
+                "cari",
+                "jelaskan",
+            ]
+        )
         assert mock_agent.last_response_metadata.intent == "general"
 
     @pytest.mark.asyncio
@@ -112,9 +182,14 @@ class TestMockAIAgent:
         # Test contextual response when user follows up with size
         response = await mock_agent.generate_response("5mm", sample_context)
         # LLM-like responses should understand thickness context
-        assert any(term in response.lower() for term in ["5mm", "5 mm", "tebal", "ketebalan", "ukuran", "tersedia"])
+        assert any(
+            term in response.lower()
+            for term in ["5mm", "5 mm", "tebal", "ketebalan", "ukuran", "tersedia"]
+        )
         # Should detect thickness entity
-        assert "5mm" in str(mock_agent.last_response_metadata.entities.get("thickness", []))
+        assert "5mm" in str(
+            mock_agent.last_response_metadata.entities.get("thickness", [])
+        )
 
     @pytest.mark.asyncio
     async def test_contextual_response_with_hollow_size(self, mock_agent):
@@ -140,7 +215,9 @@ class TestMockAIAgent:
         # LLM-like responses should be relevant to dimensions or products
         assert len(response) > 10  # Has meaningful response
         # Should detect dimension entity
-        assert "40x40" in str(mock_agent.last_response_metadata.entities.get("dimensions", []))
+        assert "40x40" in str(
+            mock_agent.last_response_metadata.entities.get("dimensions", [])
+        )
 
     @pytest.mark.asyncio
     async def test_contextual_quantity_response(self, mock_agent):
@@ -212,14 +289,20 @@ class TestMockAIAgent:
     async def test_case_insensitive_detection(self, mock_agent):
         # Test case insensitivity
         response1 = await mock_agent.generate_response("HALO")
-        assert any(term in response1.lower() for term in ["selamat", "perky", "sms perkasa", "bantu"])
+        assert any(
+            term in response1.lower()
+            for term in ["selamat", "perky", "sms perkasa", "bantu"]
+        )
         assert mock_agent.last_response_metadata.intent == "greeting"
 
         response2 = await mock_agent.generate_response("PlAt BaJa")
         assert any(term in response2.lower() for term in ["plat", "baja", "tersedia"])
 
         response3 = await mock_agent.generate_response("HOLLOW")
-        assert any(term in response3.lower() for term in ["hollow", "besi", "galvanis", "tersedia"])
+        assert any(
+            term in response3.lower()
+            for term in ["hollow", "besi", "galvanis", "tersedia"]
+        )
 
     @pytest.mark.asyncio
     async def test_multiple_keyword_detection(self, mock_agent):

@@ -6,23 +6,24 @@ following the patterns specified in the Phase 5 integration workflow.
 
 import os
 from typing import Optional
+
+from src.application.services.chat_orchestrator import ChatOrchestrator
+from src.application.use_cases.get_conversation import GetConversationUseCaseImpl
+from src.application.use_cases.process_message import ProcessUserMessageUseCaseImpl
+
+# Import application layer components
+from src.application.use_cases.start_chat_session import StartChatSessionUseCaseImpl
 from src.core.config import settings
-from src.infrastructure.mocks.container.mock_container import (
-    MockInfrastructureContainer,
-)
 
 # Import real implementations
 from src.infrastructure.ai.chat_agent import ChatAgent
+from src.infrastructure.mocks.container.mock_container import (
+    MockInfrastructureContainer,
+)
 from src.infrastructure.repositories.in_memory_conversation_repository import (
     InMemoryConversationRepository,
 )
 from src.infrastructure.services.mock_product_service import MockProductService
-
-# Import application layer components
-from src.application.use_cases.start_chat_session import StartChatSessionUseCaseImpl
-from src.application.use_cases.process_message import ProcessUserMessageUseCaseImpl
-from src.application.use_cases.get_conversation import GetConversationUseCaseImpl
-from src.application.services.chat_orchestrator import ChatOrchestrator
 
 
 class ServiceConfiguration:

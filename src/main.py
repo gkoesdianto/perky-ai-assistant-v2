@@ -1,12 +1,14 @@
+import logging
+from contextlib import asynccontextmanager
+
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import HTMLResponse
-from contextlib import asynccontextmanager
-from src.presentation.api import health
-from src.presentation.api.v1 import websocket
+
 from src.core.config import settings
 from src.infrastructure.container import get_singleton_container
-import logging
+from src.presentation.api import health
+from src.presentation.api.v1 import websocket
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)

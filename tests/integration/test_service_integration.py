@@ -4,17 +4,18 @@ Tests that all services (ChatAgent, ProductService, Container) work together
 after Track 1-3 completion. Run this after individual tracks are complete.
 """
 
-import pytest
 from unittest.mock import AsyncMock, MagicMock, patch
-from src.infrastructure.container import get_container, Container
+
+import pytest
+
+from src.infrastructure.container import Container, get_container
 from src.infrastructure.mocks.container.mock_container import (
     MockInfrastructureContainer,
 )
-
-from src.infrastructure.services.mock_product_service import MockProductService
 from src.infrastructure.repositories.in_memory_conversation_repository import (
     InMemoryConversationRepository,
 )
+from src.infrastructure.services.mock_product_service import MockProductService
 
 
 class TestServiceIntegration:
@@ -52,7 +53,10 @@ class TestServiceIntegration:
 
         products = await product_service.search_products("plat")
         assert len(products) > 0
-        assert any("plat" in p.product_name.lower() or "baja" in p.product_name.lower() for p in products)
+        assert any(
+            "plat" in p.product_name.lower() or "baja" in p.product_name.lower()
+            for p in products
+        )
 
         with patch.dict("os.environ", {"OPENAI_API_KEY": "test-key"}):
             with patch("src.infrastructure.ai.chat_agent.Agent") as mock_agent_class:
@@ -66,13 +70,14 @@ class TestServiceIntegration:
                 # Test that tools can access product service
                 variant = await product_service.get_variant_by_sku("PLT-5MM-4X8")
                 assert variant is not None
-                assert hasattr(variant, 'stock_quantity')
+                assert hasattr(variant, "stock_quantity")
 
     @pytest.mark.asyncio
     async def test_conversation_repository_integration(self):
         """Test conversation repository stores and retrieves correctly."""
-        from src.domain.entities import Conversation, Message
         from datetime import datetime, timezone
+
+        from src.domain.entities import Conversation, Message
 
         repo = InMemoryConversationRepository()
 
@@ -155,8 +160,9 @@ class TestServiceIntegration:
         repo = InMemoryConversationRepository()
         repo.max_conversations = 3
 
+        from datetime import datetime, timedelta, timezone
+
         from src.domain.entities import Conversation
-        from datetime import datetime, timezone, timedelta
 
         for i in range(4):
             conversation = Conversation(

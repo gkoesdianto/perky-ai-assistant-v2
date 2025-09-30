@@ -1,7 +1,9 @@
 from contextlib import asynccontextmanager
+
 from fastapi import FastAPI
-from src.infrastructure.database.session import engine
+
 from src.infrastructure.cache.redis_client import redis_client
+from src.infrastructure.database.session import engine
 
 
 @asynccontextmanager

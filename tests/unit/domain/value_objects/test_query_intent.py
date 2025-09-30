@@ -1,12 +1,12 @@
-"""Unit tests for QueryIntent value object focusing on intent classification and confidence validation."""
+"""Unit tests for QueryIntent: intent classification and confidence."""
 
 import pytest
 from pydantic import ValidationError
 
 from src.domain.value_objects.query_intent import (
-    QueryIntent,
     ClarificationNeeded,
     ConversationContext,
+    QueryIntent,
 )
 from tests.factories import QueryIntentFactory
 
@@ -110,7 +110,10 @@ class TestQueryIntentTypes:
     """Test suite for all valid intent types."""
 
     def test_all_intent_types(self):
-        """Test all valid intent types (product_inquiry, price_check, availability_check, general)."""
+        """Test all valid intent types.
+
+        Tests: product_inquiry, price_check, availability_check, general.
+        """
         intent_types = [
             ("product_inquiry", "Spesifikasi plat baja apa saja?"),
             ("price_check", "Berapa harga plat baja 5mm?"),
@@ -357,7 +360,11 @@ class TestIntentWithProductContext:
 
         for intent in intents:
             assert intent.product_name is not None
-            assert intent.type in ["product_inquiry", "price_check", "availability_check"]
+            assert intent.type in [
+                "product_inquiry",
+                "price_check",
+                "availability_check",
+            ]
             assert 0.0 <= intent.confidence <= 1.0
 
 
@@ -620,4 +627,7 @@ class TestConversationalFlow:
 
         assert len(intent.conversation_context.pending_clarifications) == 2
         assert intent.conversation_context.pending_clarifications[0].priority == 1
-        assert intent.conversation_context.pending_clarifications[1].depends_on == "product_type"
+        assert (
+            intent.conversation_context.pending_clarifications[1].depends_on
+            == "product_type"
+        )

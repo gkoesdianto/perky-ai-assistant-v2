@@ -1,8 +1,8 @@
 """Async message queue for WebSocket processing."""
 
 import asyncio
-from typing import Dict, Any, Callable, Optional
 import logging
+from typing import Any, Callable, Dict, Optional
 
 logger = logging.getLogger(__name__)
 

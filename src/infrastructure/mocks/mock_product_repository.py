@@ -80,7 +80,9 @@ class MockProductRepository(ProductRepository):
         product_info = ProductInfo(
             product_id="PROD-001",
             product_name="Plat Baja Hitam SS400",
-            product_description="Plat baja kualitas SS400 untuk konstruksi umum dan fabrikasi",
+            product_description=(
+                "Plat baja kualitas SS400 untuk konstruksi umum dan fabrikasi"
+            ),
             category="Plat",
             variant_count=8,
         )
@@ -247,7 +249,9 @@ class MockProductRepository(ProductRepository):
         product_info = ProductInfo(
             product_id="PROD-002",
             product_name="Besi Hollow Galvanis",
-            product_description="Hollow section galvanis untuk rangka dan konstruksi ringan",
+            product_description=(
+                "Hollow section galvanis untuk rangka dan konstruksi ringan"
+            ),
             category="Hollow",
             variant_count=8,
         )
@@ -407,7 +411,9 @@ class MockProductRepository(ProductRepository):
         product_info = ProductInfo(
             product_id="PROD-003",
             product_name="H-Beam WF",
-            product_description="Wide Flange beam untuk struktur bangunan dan konstruksi berat",
+            product_description=(
+                "Wide Flange beam untuk struktur bangunan dan konstruksi berat"
+            ),
             category="Profil",
             variant_count=7,
         )
@@ -548,7 +554,9 @@ class MockProductRepository(ProductRepository):
         product_info = ProductInfo(
             product_id="PROD-004",
             product_name="Besi Beton",
-            product_description="Besi beton ulir dan polos untuk tulangan konstruksi beton",
+            product_description=(
+                "Besi beton ulir dan polos untuk tulangan konstruksi beton"
+            ),
             category="Besi Beton",
             variant_count=9,
         )
@@ -725,7 +733,9 @@ class MockProductRepository(ProductRepository):
         product_info = ProductInfo(
             product_id="PROD-005",
             product_name="Pipa Baja",
-            product_description="Pipa baja hitam dan galvanis untuk berbagai aplikasi industri",
+            product_description=(
+                "Pipa baja hitam dan galvanis untuk berbagai aplikasi industri"
+            ),
             category="Pipa",
             variant_count=8,
         )

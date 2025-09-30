@@ -6,19 +6,18 @@ Enables easy switching between mock and real implementations via environment fla
 import os
 from dataclasses import dataclass
 
-from src.infrastructure.mocks.mock_redis_client import MockRedisClient
+# Real implementation imports for Phase 5
+from src.infrastructure.ai.chat_agent import ChatAgent
+from src.infrastructure.mocks.mock_ai_agent import MockAIAgent
 from src.infrastructure.mocks.mock_conversation_repository import (
     MockConversationRepository,
 )
-from src.infrastructure.mocks.mock_session_repository import MockSessionRepository
 from src.infrastructure.mocks.mock_product_repository import MockProductRepository
 from src.infrastructure.mocks.mock_query_analyzer import MockQueryAnalyzer
-from src.infrastructure.mocks.mock_ai_agent import MockAIAgent
-
-# Real implementation imports for Phase 5
-from src.infrastructure.ai.chat_agent import ChatAgent
+from src.infrastructure.mocks.mock_redis_client import MockRedisClient
+from src.infrastructure.mocks.mock_session_repository import MockSessionRepository
 from src.infrastructure.repositories.in_memory_conversation_repository import (
-    InMemoryConversationRepository
+    InMemoryConversationRepository,
 )
 from src.infrastructure.services.mock_product_service import MockProductService
 

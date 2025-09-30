@@ -1,5 +1,6 @@
-from pydantic import BaseModel, Field, ConfigDict
-from typing import Literal, Optional, List, Dict, Any
+from typing import Any, Dict, List, Literal, Optional
+
+from pydantic import BaseModel, ConfigDict, Field
 
 
 class ClarificationNeeded(BaseModel):
@@ -60,9 +61,9 @@ class QueryIntent(BaseModel):
         "general",
     ]
 
-    clarification_stage: Literal["initial", "narrowing", "confirming", "complete"] = (
-        Field(default="initial")
-    )
+    clarification_stage: Literal[
+        "initial", "narrowing", "confirming", "complete"
+    ] = Field(default="initial")
 
     query_level: Literal["product", "variant", "ambiguous"] = Field(
         default="ambiguous",

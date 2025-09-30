@@ -6,8 +6,8 @@ for the infrastructure layer.
 
 from .service_config import (
     ServiceConfiguration,
-    service_config,
     configure_services_for_mode,
+    service_config,
 )
 
 __all__ = [

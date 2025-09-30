@@ -1,10 +1,10 @@
-from typing import Optional, Dict, Any
 import logging
+from typing import Any, Dict, Optional
 
-from src.domain.entities.message import Message
-from src.domain.entities.conversation import Conversation
 from src.application.dto.message_dto import MessageDTO
 from src.application.use_cases.interfaces import ProcessUserMessageUseCase
+from src.domain.entities.conversation import Conversation
+from src.domain.entities.message import Message
 
 logger = logging.getLogger(__name__)
 
@@ -47,7 +47,8 @@ class ProcessUserMessageUseCaseImpl(ProcessUserMessageUseCase):
                     metadata=metadata or {},
                 )
 
-            # 2. Prepare conversation context BEFORE adding new message (last 4 messages = 2 exchanges)
+            # 2. Prepare conversation context BEFORE adding new message
+            # (last 4 messages = 2 exchanges)
             context = {
                 "conversation_history": [
                     {"sender": msg.sender_type, "content": msg.content}
@@ -65,7 +66,8 @@ class ProcessUserMessageUseCaseImpl(ProcessUserMessageUseCase):
             )
 
             # 4. Generate AI response using single agent with tools
-            # The chat_agent can be either a PydanticAI agent or AIAgentPort implementation
+            # The chat_agent can be either a PydanticAI agent or
+            # AIAgentPort implementation
             if hasattr(self.chat_agent, "run"):
                 # PydanticAI agent pattern
                 response_content = await self.chat_agent.run(
@@ -83,9 +85,8 @@ class ProcessUserMessageUseCaseImpl(ProcessUserMessageUseCase):
                         timestamp=msg.created_at,
                         metadata=msg.metadata,
                     )
-                    for msg in conversation.get_context(
-                        limit=4
-                    )  # Use same limit as PydanticAI pattern
+                    for msg in conversation.get_context(limit=4)
+                    # Use same limit as PydanticAI pattern
                 ]
                 response_content = await self.chat_agent.generate_response(
                     message=content,
@@ -127,7 +128,10 @@ class ProcessUserMessageUseCaseImpl(ProcessUserMessageUseCase):
             error_message = Message(
                 conversation_id=conversation.id if conversation else "",
                 sender_type="ai_agent",
-                content="Maaf, terjadi kesalahan dalam memproses pesan Anda. Silakan coba lagi.",
+                content=(
+                    "Maaf, terjadi kesalahan dalam memproses pesan Anda. "
+                    "Silakan coba lagi."
+                ),
                 metadata={"error": str(e), "error_type": type(e).__name__},
             )
 

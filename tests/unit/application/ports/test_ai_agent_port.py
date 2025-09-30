@@ -12,9 +12,7 @@ class TestMockAIAgentAdapter:
 
     async def test_generate_response_without_context(self, mock_ai_agent):
         """Test generating response without conversation context."""
-        mock_ai_agent.generate_response.return_value = (
-            "Halo! Ada yang bisa saya bantu?"
-        )
+        mock_ai_agent.generate_response.return_value = "Halo! Ada yang bisa saya bantu?"
 
         response = await mock_ai_agent.generate_response("Halo")
 
@@ -43,7 +41,10 @@ class TestMockAIAgentAdapter:
     async def test_generate_response_for_product_inquiry(self, mock_ai_agent):
         """Test AI response for product inquiry."""
         inquiry = "Apakah ada baja ringan untuk atap?"
-        expected = "Ya, kami memiliki berbagai jenis baja ringan untuk atap dengan berbagai ukuran"
+        expected = (
+            "Ya, kami memiliki berbagai jenis baja ringan untuk atap "
+            "dengan berbagai ukuran"
+        )
         mock_ai_agent.generate_response.return_value = expected
 
         response = await mock_ai_agent.generate_response(inquiry)

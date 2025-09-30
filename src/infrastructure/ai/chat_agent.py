@@ -4,7 +4,6 @@ import logging
 import os
 from dataclasses import dataclass
 from datetime import datetime
-from decimal import Decimal
 from typing import Any, Dict, List, Optional
 
 from dotenv import load_dotenv
@@ -14,6 +13,7 @@ from pydantic_ai.models.openai import OpenAIChatModel
 
 from src.application.dto import MessageDTO
 from src.application.ports import AIAgentPort, ProductServicePort
+from src.core.formatting import format_rupiah
 from src.infrastructure.ai.prompts.indonesian_templates import (
     ERROR_MESSAGES,
     GREETING_TEMPLATES,
@@ -98,15 +98,19 @@ TEMPLATE RESPONSES - GUNAKAN KETIKA SESUAI:
 
 3. Untuk informasi stok:
    - Stok habis: "Mohon maaf, {variant_name} saat ini sedang kosong."
-   - Stok rendah (≤10): "Stok {variant_name} terbatas, tersisa {stock_quantity} {stock_unit}."
+   - Stok rendah (≤10): "Stok {variant_name} terbatas, tersisa
+     {stock_quantity} {stock_unit}."
    - Stok tersedia: "{variant_name} tersedia, stok {stock_quantity} {stock_unit}."
 
 4. Untuk pesan error:
-   - Varian tidak ditemukan: "Mohon maaf, {variant_spec} untuk {product_name} tidak ditemukan."
-   - Error sistem: "Maaf, saya mengalami kendala teknis. Silakan hubungi tim sales kami."
+   - Varian tidak ditemukan: "Mohon maaf, {variant_spec} untuk
+     {product_name} tidak ditemukan."
+   - Error sistem: "Maaf, saya mengalami kendala teknis.
+     Silakan hubungi tim sales kami."
 
 CATATAN PENTING TENTANG TEMPLATES:
-- Tool responses sudah menyediakan pesan terformat di field "_formatted_stock" dan "_formatted_price"
+- Tool responses sudah menyediakan pesan terformat di field
+  "_formatted_stock" dan "_formatted_price"
 - GUNAKAN pesan terformat tersebut langsung dalam respons Anda
 - Jangan format ulang atau ubah pesan yang sudah terformat
 - Templates memastikan konsistensi komunikasi profesional
@@ -454,8 +458,8 @@ class ChatAgent(AIAgentPort):
                 if min_price == max_price:
                     price_range = matching_variants[0].get_display_price()
                 else:
-                    min_p = self._format_rupiah(min_price)
-                    max_p = self._format_rupiah(max_price)
+                    min_p = format_rupiah(min_price)
+                    max_p = format_rupiah(max_price)
                     price_range = f"{min_p} - {max_p}"
             else:
                 price_range = None
@@ -621,16 +625,6 @@ class ChatAgent(AIAgentPort):
             return await self._find_variants_by_specification_tool(
                 ctx, product_id, specifications
             )
-
-    def _format_rupiah(self, amount: Decimal) -> str:
-        """Format amount as Indonesian Rupiah."""
-        price_str = f"{amount:.0f}"
-        formatted = ""
-        for i, digit in enumerate(reversed(price_str)):
-            if i > 0 and i % 3 == 0:
-                formatted = "." + formatted
-            formatted = digit + formatted
-        return f"Rp {formatted}"
 
     async def generate_response(
         self,

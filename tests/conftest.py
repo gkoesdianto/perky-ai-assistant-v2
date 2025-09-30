@@ -5,26 +5,26 @@ This file provides:
 2. Shared test utilities
 """
 
-import pytest
-from unittest.mock import AsyncMock, MagicMock, patch
 from datetime import datetime, timedelta, timezone
+from unittest.mock import AsyncMock, MagicMock, patch
+
+import pytest
 
 # Import all factories
 from tests.factories import (
-    SessionFactory,
     ConversationFactory,
+    DTOFactory,
     MessageFactory,
-    ProductFactory,
-    VariantInfoFactory,
-    QueryIntentFactory,
     MockAIAgentFactory,
     MockProductServiceFactory,
     MockRedisFactory,
-    DTOFactory,
+    ProductFactory,
     ProductWithVariantsFactory,
+    QueryIntentFactory,
+    SessionFactory,
     TestDataPresets,
+    VariantInfoFactory,
 )
-
 
 # =============================================================================
 # Domain Fixtures
@@ -551,7 +551,10 @@ def sample_query_analyzer_messages():
             timestamp=datetime(2024, 1, 1, 10, 0, 0, tzinfo=timezone.utc),
         ),
         DTOFactory.create_message_dto(
-            content="Kami memiliki berbagai ukuran besi hollow. Ukuran apa yang Anda cari?",
+            content=(
+                "Kami memiliki berbagai ukuran besi hollow. "
+                "Ukuran apa yang Anda cari?"
+            ),
             sender_type="ai_agent",
             timestamp=datetime(2024, 1, 1, 10, 0, 30, tzinfo=timezone.utc),
         ),
@@ -690,7 +693,9 @@ def mock_assertion_helpers():
         @staticmethod
         def assert_called_with_retry(mock, expected_calls=3):
             """Assert mock was called with retry logic."""
-            assert mock.call_count == expected_calls, f"Expected {expected_calls} calls, got {mock.call_count}"
+            assert (
+                mock.call_count == expected_calls
+            ), f"Expected {expected_calls} calls, got {mock.call_count}"
 
         @staticmethod
         def assert_error_handled(mock_service, mock_logger=None):

@@ -1,10 +1,10 @@
 """WebSocket router for real-time chat communication."""
 
-from fastapi import APIRouter, WebSocket, Depends, Query
+from fastapi import APIRouter, Depends, Query, WebSocket
 
-from src.presentation.websocket.chat_ws import ChatWebSocket
-from src.presentation.dependencies import get_chat_orchestrator
 from src.application.services.chat_orchestrator import ChatOrchestrator
+from src.presentation.dependencies import get_chat_orchestrator
+from src.presentation.websocket.chat_ws import ChatWebSocket
 
 router = APIRouter(tags=["websocket"])
 

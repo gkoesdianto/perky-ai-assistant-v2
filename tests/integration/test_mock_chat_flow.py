@@ -8,11 +8,14 @@ Tests the three core MVP scenarios with complete chat flow:
 """
 
 import pytest
-from src.infrastructure.mocks.container.mock_container import MockInfrastructureContainer
+
 from src.application.services.chat_orchestrator import ChatOrchestrator
-from src.application.use_cases.start_chat_session import StartChatSessionUseCaseImpl
-from src.application.use_cases.process_message import ProcessUserMessageUseCaseImpl
 from src.application.use_cases.get_conversation import GetConversationUseCaseImpl
+from src.application.use_cases.process_message import ProcessUserMessageUseCaseImpl
+from src.application.use_cases.start_chat_session import StartChatSessionUseCaseImpl
+from src.infrastructure.mocks.container.mock_container import (
+    MockInfrastructureContainer,
+)
 
 
 class TestMockChatFlow:

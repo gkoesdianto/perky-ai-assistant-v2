@@ -1,14 +1,14 @@
 """Test data factories for DTOs and value objects."""
 
+import uuid
 from datetime import datetime, timezone
 from decimal import Decimal
-from typing import Dict, Any, List, Optional
-import uuid
+from typing import Any, Dict, List, Optional
 
-from tests.factories.base import BaseFactory
-from src.application.dto import SessionDTO, MessageDTO, ConversationDTO
+from src.application.dto import ConversationDTO, MessageDTO, SessionDTO
 from src.application.dto.product_query_dto import ProductQueryDTO, ProductResponseDTO
 from src.domain.value_objects import ProductWithVariantsInfo
+from tests.factories.base import BaseFactory
 
 
 class DTOFactory(BaseFactory):
@@ -19,12 +19,12 @@ class DTOFactory(BaseFactory):
         """Create SessionDTO."""
         now = datetime.now(timezone.utc)
         defaults = {
-            'session_id': f"test-session-{uuid.uuid4().hex[:8]}",
-            'conversation_id': None,
-            'started_at': now,
-            'last_activity': now,
-            'is_active': True,
-            'metadata': {'source': 'test'},
+            "session_id": f"test-session-{uuid.uuid4().hex[:8]}",
+            "conversation_id": None,
+            "started_at": now,
+            "last_activity": now,
+            "is_active": True,
+            "metadata": {"source": "test"},
         }
         defaults.update(kwargs)
         return SessionDTO(**defaults)
@@ -33,12 +33,12 @@ class DTOFactory(BaseFactory):
     def create_message_dto(cls, **kwargs) -> MessageDTO:
         """Create MessageDTO."""
         defaults = {
-            'content': 'Test message',
-            'sender_type': 'user',
-            'session_id': f"test-session-{uuid.uuid4().hex[:8]}",
-            'conversation_id': None,
-            'timestamp': datetime.now(timezone.utc),
-            'metadata': {},
+            "content": "Test message",
+            "sender_type": "user",
+            "session_id": f"test-session-{uuid.uuid4().hex[:8]}",
+            "conversation_id": None,
+            "timestamp": datetime.now(timezone.utc),
+            "metadata": {},
         }
         defaults.update(kwargs)
         return MessageDTO(**defaults)
@@ -48,18 +48,20 @@ class DTOFactory(BaseFactory):
         """Create ConversationDTO."""
         now = datetime.now(timezone.utc)
         defaults = {
-            'id': f"conv-{uuid.uuid4().hex[:8]}",
-            'session_id': f"test-session-{uuid.uuid4().hex[:8]}",
-            'started_at': now,
-            'last_activity': now,
-            'messages': [],
-            'metadata': {'test': True},
+            "id": f"conv-{uuid.uuid4().hex[:8]}",
+            "session_id": f"test-session-{uuid.uuid4().hex[:8]}",
+            "started_at": now,
+            "last_activity": now,
+            "messages": [],
+            "metadata": {"test": True},
         }
         defaults.update(kwargs)
         return ConversationDTO(**defaults)
 
     @classmethod
-    def create_conversation_with_messages(cls, num_messages: int = 5, **kwargs) -> ConversationDTO:
+    def create_conversation_with_messages(
+        cls, num_messages: int = 5, **kwargs
+    ) -> ConversationDTO:
         """Create ConversationDTO with messages."""
         conversation = cls.create_conversation_dto(**kwargs)
 
@@ -78,45 +80,52 @@ class DTOFactory(BaseFactory):
     def create_product_query_dto(cls, **kwargs) -> ProductQueryDTO:
         """Create ProductQueryDTO."""
         defaults = {
-            'query': 'plat baja',
-            'session_id': f"test-session-{uuid.uuid4().hex[:8]}",
-            'include_variants': True,
-            'max_results': 10,
+            "query": "plat baja",
+            "session_id": f"test-session-{uuid.uuid4().hex[:8]}",
+            "include_variants": True,
+            "max_results": 10,
         }
         defaults.update(kwargs)
         return ProductQueryDTO(**defaults)
 
     @classmethod
-    def create_product_response_dto(cls, products: Optional[List] = None, **kwargs) -> ProductResponseDTO:
+    def create_product_response_dto(
+        cls, products: Optional[List] = None, **kwargs
+    ) -> ProductResponseDTO:
         """Create ProductResponseDTO."""
         if products is None:
             # Create a default product list if none provided
             from tests.factories.domain import ProductFactory
+
             product = ProductFactory.steel_plate()
-            products = [{
-                'product_id': product.product_id,
-                'product_name': product.product_name,
-                'variant_count': product.variant_count,
-            }]
+            products = [
+                {
+                    "product_id": product.product_id,
+                    "product_name": product.product_name,
+                    "variant_count": product.variant_count,
+                }
+            ]
 
         # Convert product objects to dicts if needed
         product_dicts = []
         for p in products:
-            if hasattr(p, '__dict__'):
+            if hasattr(p, "__dict__"):
                 # Convert object to dict
-                product_dicts.append({
-                    'product_id': p.product_id,
-                    'product_name': p.product_name,
-                    'variant_count': p.variant_count,
-                })
+                product_dicts.append(
+                    {
+                        "product_id": p.product_id,
+                        "product_name": p.product_name,
+                        "variant_count": p.variant_count,
+                    }
+                )
             else:
                 product_dicts.append(p)
 
         defaults = {
-            'products': product_dicts,
-            'query': 'plat baja',
-            'response_time_ms': 100,
-            'source': 'mock',
+            "products": product_dicts,
+            "query": "plat baja",
+            "response_time_ms": 100,
+            "source": "mock",
         }
         defaults.update(kwargs)
         return ProductResponseDTO(**defaults)
@@ -139,8 +148,8 @@ class ProductWithVariantsFactory(BaseFactory[ProductWithVariantsInfo]):
         ]
 
         return {
-            'product': product,
-            'variants': variants,
+            "product": product,
+            "variants": variants,
         }
 
     @classmethod
@@ -153,25 +162,25 @@ class ProductWithVariantsFactory(BaseFactory[ProductWithVariantsInfo]):
             VariantInfoFactory.steel_plate_10mm(),
             VariantInfoFactory.steel_plate_5mm(),
             VariantInfoFactory.create(
-                variant_id='var_003',
-                sku='PLT-15MM-001',
-                product_id='prod_plat_baja',
-                variant_name='Plat Baja 15mm x 1200mm x 2400mm',
-                price=Decimal('1050000'),
+                variant_id="var_003",
+                sku="PLT-15MM-001",
+                product_id="prod_plat_baja",
+                variant_name="Plat Baja 15mm x 1200mm x 2400mm",
+                price=Decimal("1050000"),
                 stock_quantity=15,
-                stock_unit='lembar',
+                stock_unit="lembar",
                 specifications={
-                    'thickness': '15mm',
-                    'width': '1200mm',
-                    'length': '2400mm',
-                    'grade': 'SS400',
-                }
-            )
+                    "thickness": "15mm",
+                    "width": "1200mm",
+                    "length": "2400mm",
+                    "grade": "SS400",
+                },
+            ),
         ]
 
         defaults = {
-            'product': product,
-            'variants': variants,
+            "product": product,
+            "variants": variants,
         }
         defaults.update(kwargs)
         return cls._model(**defaults)
@@ -185,8 +194,8 @@ class ProductWithVariantsFactory(BaseFactory[ProductWithVariantsInfo]):
         variants = [VariantInfoFactory.create(product_id=product.product_id)]
 
         defaults = {
-            'product': product,
-            'variants': variants,
+            "product": product,
+            "variants": variants,
         }
         defaults.update(kwargs)
         return cls._model(**defaults)
@@ -198,7 +207,11 @@ class TestDataPresets:
     @classmethod
     def create_full_conversation_context(cls):
         """Create a complete conversation context for testing."""
-        from tests.factories.domain import SessionFactory, ConversationFactory, MessageFactory
+        from tests.factories.domain import (
+            ConversationFactory,
+            MessageFactory,
+            SessionFactory,
+        )
 
         # Create session
         session = SessionFactory.with_metadata()
@@ -220,9 +233,9 @@ class TestDataPresets:
         session.conversation_id = conversation.id
 
         return {
-            'session': session,
-            'conversation': conversation,
-            'messages': messages,
+            "session": session,
+            "conversation": conversation,
+            "messages": messages,
         }
 
     @classmethod
@@ -245,19 +258,17 @@ class TestDataPresets:
 
         # Create query
         query_dto = DTOFactory.create_product_query_dto(
-            query='plat baja 5mm',
-            max_results=10
+            query="plat baja 5mm", max_results=10
         )
 
         # Create response
         response_dto = DTOFactory.create_product_response_dto(
-            products=products,
-            query=query_dto.query
+            products=products, query=query_dto.query
         )
 
         return {
-            'query': query_dto,
-            'response': response_dto,
-            'products': products,
-            'variants': variants,
+            "query": query_dto,
+            "response": response_dto,
+            "products": products,
+            "variants": variants,
         }

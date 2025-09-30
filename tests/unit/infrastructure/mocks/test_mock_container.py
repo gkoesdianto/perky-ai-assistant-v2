@@ -1,15 +1,20 @@
 """Unit tests for MockInfrastructureContainer."""
 
 import os
-import pytest
 from unittest.mock import patch
 
-from src.infrastructure.mocks.container.mock_container import MockInfrastructureContainer
-from src.infrastructure.mocks.mock_redis_client import MockRedisClient
-from src.infrastructure.mocks.mock_conversation_repository import MockConversationRepository
+import pytest
+
+from src.infrastructure.mocks.container.mock_container import (
+    MockInfrastructureContainer,
+)
+from src.infrastructure.mocks.mock_ai_agent import MockAIAgent
+from src.infrastructure.mocks.mock_conversation_repository import (
+    MockConversationRepository,
+)
 from src.infrastructure.mocks.mock_product_repository import MockProductRepository
 from src.infrastructure.mocks.mock_query_analyzer import MockQueryAnalyzer
-from src.infrastructure.mocks.mock_ai_agent import MockAIAgent
+from src.infrastructure.mocks.mock_redis_client import MockRedisClient
 
 
 class TestMockInfrastructureContainer:
@@ -35,7 +40,9 @@ class TestMockInfrastructureContainer:
         container = MockInfrastructureContainer(use_mocks=True)
 
         assert isinstance(container.get_redis_client(), MockRedisClient)
-        assert isinstance(container.get_conversation_repository(), MockConversationRepository)
+        assert isinstance(
+            container.get_conversation_repository(), MockConversationRepository
+        )
         assert isinstance(container.get_product_repository(), MockProductRepository)
         assert isinstance(container.get_query_analyzer(), MockQueryAnalyzer)
         assert isinstance(container.get_ai_agent(), MockAIAgent)
@@ -81,11 +88,14 @@ class TestMockInfrastructureContainer:
         assert container.use_mocks is False
         assert container.mode == "real"
 
-    @patch.dict(os.environ, {
-        "MOCK_RESPONSE_DELAY_MS": "100",
-        "MOCK_ERROR_RATE": "0.1",
-        "MOCK_DATA_SEED": "123"
-    })
+    @patch.dict(
+        os.environ,
+        {
+            "MOCK_RESPONSE_DELAY_MS": "100",
+            "MOCK_ERROR_RATE": "0.1",
+            "MOCK_DATA_SEED": "123",
+        },
+    )
     def test_mock_configuration_from_environment(self):
         """Test that mock configuration is loaded from environment."""
         container = MockInfrastructureContainer(use_mocks=True)

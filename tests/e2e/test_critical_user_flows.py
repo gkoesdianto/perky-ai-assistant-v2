@@ -100,7 +100,8 @@ class TestCriticalUserFlows:
         # Specific product inquiry
         response = e2e_helper.send_message(ws_client, "Ada besi beton diameter 12?")
         assert response["type"] == "ai_response"
-        # Check for relevant business logic - response should contain product/price/spec info
+        # Check for relevant business logic
+        # Response should contain product/price/spec info
         msg_lower = response["message"].lower()
         business_indicators = [
             "besi",
@@ -114,9 +115,10 @@ class TestCriticalUserFlows:
             "tersedia",
             "stok",
         ]
-        assert any(
-            indicator in msg_lower for indicator in business_indicators
-        ), f"Response doesn't contain product-related information: {response['message']}"
+        assert any(indicator in msg_lower for indicator in business_indicators), (
+            "Response doesn't contain product-related information: "
+            f"{response['message']}"
+        )
 
     def test_multi_product_comparison_flow(self, ws_client, e2e_helper):
         """Test user comparing multiple products - simplified for MVP."""
