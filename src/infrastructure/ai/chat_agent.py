@@ -9,6 +9,13 @@ from typing import Any, Dict, List, Optional
 from dotenv import load_dotenv
 from pydantic import BaseModel, Field
 from pydantic_ai import Agent, RunContext
+from pydantic_ai.messages import (
+    ModelMessage,
+    ModelRequest,
+    ModelResponse,
+    TextPart,
+    UserPromptPart,
+)
 from pydantic_ai.models.openai import OpenAIChatModel
 
 from src.application.dto import MessageDTO
@@ -251,6 +258,51 @@ class ChatAgent(AIAgentPort):
             return GREETING_TEMPLATES["evening"]
         else:
             return GREETING_TEMPLATES["default"]
+
+    def _convert_dto_to_model_messages(
+        self, conversation_context: List[MessageDTO]
+    ) -> list[ModelMessage]:
+        """Convert MessageDTO objects to PydanticAI ModelMessage format.
+
+        Args:
+            conversation_context: List of MessageDTO from conversation history
+
+        Returns:
+            List of ModelMessage objects suitable for PydanticAI agent.run()
+        """
+        messages: list[ModelMessage] = []
+
+        for msg in conversation_context[-10:]:  # Keep last 10 messages
+            try:
+                if msg.sender_type == "user":
+                    # User message -> ModelRequest with UserPromptPart
+                    messages.append(
+                        ModelRequest(
+                            parts=[
+                                UserPromptPart(
+                                    content=msg.content,
+                                    timestamp=msg.timestamp,
+                                )
+                            ]
+                        )
+                    )
+                else:  # ai_agent
+                    # AI response -> ModelResponse with TextPart
+                    messages.append(
+                        ModelResponse(
+                            parts=[TextPart(content=msg.content)],
+                            timestamp=msg.timestamp,
+                        )
+                    )
+            except Exception as e:
+                logger.warning(
+                    f"Failed to convert message to ModelMessage format: {e}",
+                    exc_info=True,
+                )
+                # Skip malformed messages rather than failing
+                continue
+
+        return messages
 
     def _format_stock_message(self, variant: Any) -> str:
         """Format stock information using templates."""
@@ -651,17 +703,12 @@ class ChatAgent(AIAgentPort):
                 if any(word in message.lower() for word in greeting_keywords):
                     return self._get_greeting()
 
-            # Build conversation history for the agent
-            messages = []
-            if conversation_context:
-                for msg in conversation_context[-10:]:  # Last 10 messages for context
-                    if msg.sender_type == "user":
-                        messages.append(("user", msg.content))
-                    else:
-                        messages.append(("assistant", msg.content))
-
-            # Add current message
-            messages.append(("user", message))
+            # Convert DTOs to PydanticAI ModelMessage format
+            message_history = None
+            if conversation_context and len(conversation_context) > 0:
+                message_history = self._convert_dto_to_model_messages(
+                    conversation_context
+                )
 
             # Create dependencies
             deps = ChatDependencies(
@@ -670,12 +717,10 @@ class ChatAgent(AIAgentPort):
                 user_metadata={},
             )
 
-            # Run the agent
+            # Run the agent with proper message history
             result = await self.agent.run(
                 message,
-                message_history=messages[
-                    :-1
-                ],  # Don't include current message in history
+                message_history=message_history,
                 deps=deps,
             )
 
@@ -685,7 +730,7 @@ class ChatAgent(AIAgentPort):
             return response
 
         except Exception as e:
-            logger.error(f"Error generating response: {e}")
+            logger.error(f"Error generating response: {e}", exc_info=True)
             # Use template for error message
             return ERROR_MESSAGES["system_error"]
 
