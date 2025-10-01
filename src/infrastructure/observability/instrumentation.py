@@ -23,7 +23,7 @@ def setup_instrumentation(app: FastAPI, logfire_instance: Optional[ModuleType] =
         return
 
     try:
-        # Phase 1: FastAPI only
+        # Phase 1: FastAPI
         logger.info("Instrumenting FastAPI application...")
         logfire.instrument_fastapi(
             app,
@@ -31,7 +31,15 @@ def setup_instrumentation(app: FastAPI, logfire_instance: Optional[ModuleType] =
             excluded_urls="/health|/metrics",  # Exclude health checks from traces
         )
 
-        logger.info("Instrumentation setup complete (Phase 1: FastAPI only)")
+        # Phase 2: PydanticAI (AUTOMATIC LLM TRACING!)
+        logger.info("Instrumenting PydanticAI agents...")
+        logfire.instrument_pydantic_ai()
+
+        # Phase 2: HTTPX (for external API calls)
+        logger.info("Instrumenting HTTPX client...")
+        logfire.instrument_httpx()
+
+        logger.info("Instrumentation setup complete (Phase 2: + PydanticAI + HTTPX)")
 
     except Exception as e:
         logger.error(f"Failed to set up instrumentation: {e}", exc_info=True)
