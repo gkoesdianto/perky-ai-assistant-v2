@@ -1,4 +1,4 @@
-from typing import List, Optional
+from typing import List, Literal, Optional
 
 from pydantic import AnyHttpUrl, ConfigDict, PostgresDsn, RedisDsn, field_validator
 from pydantic_core import MultiHostUrl
@@ -25,14 +25,14 @@ class Settings(BaseSettings):
     def set_heartbeat_interval(cls, v: Optional[int], values) -> int:
         if v is not None:
             return v
-        return values.data.get("WS_HEARTBEAT_INTERVAL", 30)
+        return int(values.data.get("WS_HEARTBEAT_INTERVAL", 30))
 
     @field_validator("MAX_MESSAGES_PER_MINUTE", mode="before")
     @classmethod
     def set_message_rate_limit(cls, v: Optional[int], values) -> int:
         if v is not None:
             return v
-        return values.data.get("WS_MESSAGE_RATE_LIMIT", 10)
+        return int(values.data.get("WS_MESSAGE_RATE_LIMIT", 10))
 
     @field_validator("DATABASE_URL", mode="before")
     @classmethod
@@ -46,13 +46,15 @@ class Settings(BaseSettings):
         postgres_db = values.data.get("POSTGRES_DB")
 
         # Create the database URL
-        return MultiHostUrl.build(
-            scheme="postgresql+asyncpg",
-            username=postgres_user,
-            password=postgres_password,
-            host=postgres_server,
-            port=5432,
-            path=postgres_db,
+        return str(
+            MultiHostUrl.build(
+                scheme="postgresql+asyncpg",
+                username=postgres_user,
+                password=postgres_password,
+                host=postgres_server,
+                port=5432,
+                path=postgres_db,
+            )
         )
 
     # Redis - For session management and caching
@@ -84,6 +86,26 @@ class Settings(BaseSettings):
     SECRET_KEY: str
     ALGORITHM: str
     ACCESS_TOKEN_EXPIRE_MINUTES: int
+
+    # Logfire Observability
+    LOGFIRE_TOKEN: Optional[str] = None
+    LOGFIRE_ENVIRONMENT: Literal[
+        "local", "development", "staging", "production"
+    ] = "development"
+    LOGFIRE_SERVICE_NAME: str = "perky-ai-assistant"
+    LOGFIRE_SEND_TO_LOGFIRE: bool = True
+    LOGFIRE_CONSOLE: bool = False
+    LOGFIRE_SCRUBBING: bool = True
+    LOGFIRE_SAMPLING_RATIO: float = 1.0
+
+    @field_validator("LOGFIRE_SAMPLING_RATIO", mode="before")
+    @classmethod
+    def validate_sampling_ratio(cls, v) -> float:
+        """Ensure sampling ratio is between 0.0 and 1.0"""
+        v_float = float(v) if isinstance(v, str) else float(v)
+        if not 0.0 <= v_float <= 1.0:
+            raise ValueError("LOGFIRE_SAMPLING_RATIO must be between 0.0 and 1.0")
+        return v_float
 
     model_config = ConfigDict(env_file=".env", case_sensitive=True)
 
