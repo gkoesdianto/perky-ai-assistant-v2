@@ -1,7 +1,7 @@
 """Session management for WebSocket connections."""
 
-from typing import Dict, Set
 import asyncio
+from typing import Dict, Set
 
 
 class SessionManager:

@@ -1,9 +1,10 @@
 """Type definitions for WebSocket communication."""
 
+from datetime import datetime
 from enum import Enum
 from typing import Any, Dict, Optional
+
 from pydantic import BaseModel, ConfigDict
-from datetime import datetime
 
 
 class MessageType(Enum):
@@ -35,6 +36,4 @@ class WebSocketMessage(BaseModel):
     metadata: Optional[Dict[str, Any]] = None
     timestamp: Optional[datetime] = None
 
-    model_config = ConfigDict(
-        use_enum_values=True
-    )
+    model_config = ConfigDict(use_enum_values=True)

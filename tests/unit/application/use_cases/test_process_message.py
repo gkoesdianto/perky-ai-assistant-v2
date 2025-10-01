@@ -1,10 +1,11 @@
 """Tests for ProcessUserMessageUseCaseImpl using centralized fixtures."""
 
-import pytest
 from unittest.mock import AsyncMock
 
-from src.application.use_cases.process_message import ProcessUserMessageUseCaseImpl
+import pytest
+
 from src.application.dto.message_dto import MessageDTO
+from src.application.use_cases.process_message import ProcessUserMessageUseCaseImpl
 from src.domain.entities.conversation import Conversation
 from src.domain.entities.message import Message
 from src.infrastructure.repositories.in_memory_conversation_repository import (
@@ -122,7 +123,8 @@ class TestProcessUserMessageUseCaseImpl:
         self, mock_product_service, mock_conversation_repository
     ):
         """Test that errors return Indonesian error messages."""
-        # Arrange - Create an agent that raises an error (with no run attribute to trigger AIAgentPort path)
+        # Arrange - Create an agent that raises an error
+        # (with no run attribute to trigger AIAgentPort path)
         mock_ai_agent = AsyncMock()
         mock_ai_agent.generate_response = AsyncMock(
             side_effect=Exception("Connection failed")

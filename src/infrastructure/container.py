@@ -1,5 +1,6 @@
 """Infrastructure container for dependency injection."""
 
+from src.infrastructure.dependencies import configure_services_for_mode
 from src.infrastructure.mocks.container.mock_container import (
     MockInfrastructureContainer,
 )
@@ -12,9 +13,9 @@ def get_container() -> MockInfrastructureContainer:
     Returns:
         Infrastructure container with all dependencies
     """
-    # For MVP, we're using mock implementations
-    # This will be replaced with real implementations in Phase 4-5
-    return MockInfrastructureContainer(use_mocks=True)
+    # Phase 5 Track 3: Enhanced DI with real/mock mode selection
+    # Automatically determines mode from environment
+    return configure_services_for_mode()
 
 
 # Global container instance (singleton pattern)
@@ -32,6 +33,16 @@ def get_singleton_container() -> MockInfrastructureContainer:
     if _container is None:
         _container = get_container()
     return _container
+
+
+def reset_singleton_container() -> None:
+    """
+    Reset the singleton container instance.
+
+    This should be called between tests to ensure clean state.
+    """
+    global _container
+    _container = None
 
 
 # Create convenience properties for the container

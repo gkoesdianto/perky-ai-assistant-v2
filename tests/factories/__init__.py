@@ -2,36 +2,28 @@
 
 from .base import BaseFactory
 from .domain import (
-    SessionFactory,
     ConversationFactory,
     MessageFactory,
     ProductFactory,
-    VariantInfoFactory,
     QueryIntentFactory,
+    SessionFactory,
+    VariantInfoFactory,
 )
-from .mocks import (
-    MockAIAgentFactory,
-    MockProductServiceFactory,
-    MockRedisFactory,
-)
-from .test_data import (
-    DTOFactory,
-    ProductWithVariantsFactory,
-    TestDataPresets,
-)
+from .mocks import MockAIAgentFactory, MockProductServiceFactory, MockRedisFactory
+from .test_data import DTOFactory, ProductWithVariantsFactory, TestDataPresets
 
 __all__ = [
-    'BaseFactory',
-    'SessionFactory',
-    'ConversationFactory',
-    'MessageFactory',
-    'ProductFactory',
-    'VariantInfoFactory',
-    'QueryIntentFactory',
-    'MockAIAgentFactory',
-    'MockProductServiceFactory',
-    'MockRedisFactory',
-    'DTOFactory',
-    'ProductWithVariantsFactory',
-    'TestDataPresets',
+    "BaseFactory",
+    "SessionFactory",
+    "ConversationFactory",
+    "MessageFactory",
+    "ProductFactory",
+    "VariantInfoFactory",
+    "QueryIntentFactory",
+    "MockAIAgentFactory",
+    "MockProductServiceFactory",
+    "MockRedisFactory",
+    "DTOFactory",
+    "ProductWithVariantsFactory",
+    "TestDataPresets",
 ]

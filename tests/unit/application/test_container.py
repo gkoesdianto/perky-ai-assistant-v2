@@ -6,11 +6,13 @@ from unittest.mock import patch
 import pytest
 
 from src.application.container import ApplicationContainer
-from src.infrastructure.mocks.mock_redis_client import MockRedisClient
-from src.infrastructure.mocks.mock_conversation_repository import MockConversationRepository
+from src.infrastructure.mocks.mock_ai_agent import MockAIAgent
+from src.infrastructure.mocks.mock_conversation_repository import (
+    MockConversationRepository,
+)
 from src.infrastructure.mocks.mock_product_repository import MockProductRepository
 from src.infrastructure.mocks.mock_query_analyzer import MockQueryAnalyzer
-from src.infrastructure.mocks.mock_ai_agent import MockAIAgent
+from src.infrastructure.mocks.mock_redis_client import MockRedisClient
 
 
 class TestApplicationContainer:
@@ -97,11 +99,14 @@ class TestApplicationContainer:
         assert container.infrastructure.use_mocks is True
         assert container.infrastructure.mode == "mock"
 
-    @patch.dict(os.environ, {
-        "MOCK_RESPONSE_DELAY_MS": "100",
-        "MOCK_ERROR_RATE": "0.1",
-        "MOCK_DATA_SEED": "123"
-    })
+    @patch.dict(
+        os.environ,
+        {
+            "MOCK_RESPONSE_DELAY_MS": "100",
+            "MOCK_ERROR_RATE": "0.1",
+            "MOCK_DATA_SEED": "123",
+        },
+    )
     def test_mock_configuration_propagation(self):
         """Test that mock configuration is properly propagated from environment."""
         container = ApplicationContainer()

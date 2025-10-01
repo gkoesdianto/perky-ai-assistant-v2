@@ -1,11 +1,51 @@
+# Pre-commit hooks for code quality
+# Run: pre-commit install
+# Manual run: pre-commit run --all-files
+
 repos:
+  # Python code formatting - Black
+  - repo: https://github.com/psf/black
+    rev: 23.12.1
+    hooks:
+      - id: black
+        language_version: python3.12
+        args: ['--line-length=88']
+        exclude: '^migrations/'
+
+  # Import sorting - isort
+  - repo: https://github.com/pycqa/isort
+    rev: 5.13.2
+    hooks:
+      - id: isort
+        args: ['--profile=black', '--line-length=88']
+        exclude: '^migrations/'
+
+  # Python linting - Flake8
+  - repo: https://github.com/pycqa/flake8
+    rev: 7.0.0
+    hooks:
+      - id: flake8
+        args: ['--max-line-length=88', '--extend-ignore=E203,W503,E722']
+        exclude: '^(tests/e2e/.*\.sh|migrations/)'
+
+  # Type checking - mypy
+  - repo: https://github.com/pre-commit/mirrors-mypy
+    rev: v1.8.0
+    hooks:
+      - id: mypy
+        args: ['--ignore-missing-imports', '--no-strict-optional']
+        files: '^src/'
+        exclude: '^(tests/|migrations/)'
+
+  # Markdown linting
   - repo: https://github.com/igorshubovych/markdownlint-cli
     rev: v0.38.0
     hooks:
       - id: markdownlint
         args: ['--fix']
       - id: markdownlint-fix
-        
+
+  # General pre-commit hooks
   - repo: https://github.com/pre-commit/pre-commit-hooks
     rev: v4.5.0
     hooks:
@@ -17,3 +57,36 @@ repos:
       - id: check-merge-conflict
       - id: mixed-line-ending
         args: ['--fix=lf']
+      - id: check-added-large-files
+        args: ['--maxkb=1000']
+      - id: debug-statements
+      - id: check-ast
+      - id: check-docstring-first
+        files: '^src/'
+
+  # Security checks - Bandit
+  - repo: https://github.com/PyCQA/bandit
+    rev: 1.7.6
+    hooks:
+      - id: bandit
+        args: ['-r', 'src/', '-ll']
+        exclude: '^tests/'
+
+# Global settings
+default_language_version:
+  python: python3.12
+
+exclude: |
+  (?x)^(
+    .*\.pyc|
+    \.git/.*|
+    build/.*|
+    dist/.*|
+    htmlcov/.*|
+    \.coverage|
+    \.pytest_cache/.*|
+    \.mypy_cache/.*|
+    __pycache__/.*|
+    venv/.*|
+    \.venv/.*
+  )$

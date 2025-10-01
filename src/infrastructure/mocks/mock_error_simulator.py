@@ -4,10 +4,10 @@ This module provides error simulation capabilities for testing error handling
 and resilience in the mock infrastructure.
 """
 
-import random
 import asyncio
-from typing import Callable, Any
 import functools
+import random
+from typing import Any, Callable
 
 
 class MockException(Exception):

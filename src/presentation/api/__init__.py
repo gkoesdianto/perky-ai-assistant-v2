@@ -1,4 +1,5 @@
 from fastapi import APIRouter
+
 from src.presentation.api.v1 import websocket
 
 v1_router = APIRouter()

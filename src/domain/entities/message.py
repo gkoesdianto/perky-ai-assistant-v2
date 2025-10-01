@@ -1,5 +1,7 @@
-from typing import Optional, Dict, Any, Literal
+from typing import Any, Dict, Literal, Optional
+
 from pydantic import Field
+
 from src.domain.entities.base import BaseEntity
 
 

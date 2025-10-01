@@ -4,7 +4,7 @@ Read-only operations against PIM system.
 """
 
 from abc import ABC, abstractmethod
-from typing import Optional, List
+from typing import List, Optional
 
 from src.domain.value_objects import ProductInfo, VariantInfo
 from src.domain.value_objects.product_with_variants_info import ProductWithVariantsInfo

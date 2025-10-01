@@ -2,24 +2,25 @@
 
 import asyncio
 import json
+import logging
 import uuid
 from datetime import datetime
-from typing import Optional, Dict, Any
+from typing import Any, Dict, Optional
+
 from fastapi import WebSocket, WebSocketDisconnect
-import logging
 
 from src.application.services.chat_orchestrator import ChatOrchestrator
+from src.core.config import settings
 from src.presentation.websocket.connection_manager import ConnectionManager
-from src.presentation.websocket.session_manager import SessionManager
+from src.presentation.websocket.message_handler import (
+    MessageRateLimiter,
+    MessageValidator,
+)
 from src.presentation.websocket.message_queue import MessageQueue
 from src.presentation.websocket.rate_limiter import RateLimiter
-from src.presentation.websocket.types import MessageType, SystemEvent, WebSocketMessage
-from src.presentation.websocket.message_handler import (
-    MessageValidator,
-    MessageRateLimiter,
-)
 from src.presentation.websocket.reconnection import ReconnectionManager
-from src.core.config import settings
+from src.presentation.websocket.session_manager import SessionManager
+from src.presentation.websocket.types import MessageType, SystemEvent, WebSocketMessage
 
 logger = logging.getLogger(__name__)
 
@@ -59,17 +60,12 @@ class ChatWebSocket:
             max_per_minute=settings.MAX_MESSAGES_PER_MINUTE
         )
         self.message_validator = message_validator or MessageValidator()
-        self.message_rate_limiter = (
-            message_rate_limiter
-            or MessageRateLimiter(
-                max_messages_per_minute=settings.MAX_MESSAGES_PER_MINUTE,
-                max_messages_per_hour=500,
-                max_burst_size=5,
-            )
+        self.message_rate_limiter = message_rate_limiter or MessageRateLimiter(
+            max_messages_per_minute=settings.MAX_MESSAGES_PER_MINUTE,
+            max_messages_per_hour=500,
+            max_burst_size=5,
         )
-        self.reconnection_manager = (
-            reconnection_manager or ReconnectionManager()
-        )
+        self.reconnection_manager = reconnection_manager or ReconnectionManager()
         self.last_activity: Dict[str, datetime] = {}
 
     async def websocket_endpoint(self, websocket: WebSocket, session_id: str):

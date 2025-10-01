@@ -1,15 +1,20 @@
 """Unit tests for MockInfrastructureContainer."""
 
 import os
-import pytest
 from unittest.mock import patch
 
-from src.infrastructure.mocks.container.mock_container import MockInfrastructureContainer
-from src.infrastructure.mocks.mock_redis_client import MockRedisClient
-from src.infrastructure.mocks.mock_conversation_repository import MockConversationRepository
+import pytest
+
+from src.infrastructure.mocks.container.mock_container import (
+    MockInfrastructureContainer,
+)
+from src.infrastructure.mocks.mock_ai_agent import MockAIAgent
+from src.infrastructure.mocks.mock_conversation_repository import (
+    MockConversationRepository,
+)
 from src.infrastructure.mocks.mock_product_repository import MockProductRepository
 from src.infrastructure.mocks.mock_query_analyzer import MockQueryAnalyzer
-from src.infrastructure.mocks.mock_ai_agent import MockAIAgent
+from src.infrastructure.mocks.mock_redis_client import MockRedisClient
 
 
 class TestMockInfrastructureContainer:
@@ -35,7 +40,9 @@ class TestMockInfrastructureContainer:
         container = MockInfrastructureContainer(use_mocks=True)
 
         assert isinstance(container.get_redis_client(), MockRedisClient)
-        assert isinstance(container.get_conversation_repository(), MockConversationRepository)
+        assert isinstance(
+            container.get_conversation_repository(), MockConversationRepository
+        )
         assert isinstance(container.get_product_repository(), MockProductRepository)
         assert isinstance(container.get_query_analyzer(), MockQueryAnalyzer)
         assert isinstance(container.get_ai_agent(), MockAIAgent)
@@ -50,10 +57,10 @@ class TestMockInfrastructureContainer:
     @patch.dict(os.environ, {"USE_MOCK_MODE": "false"})
     def test_environment_override_to_false(self):
         """Test that USE_MOCK_MODE=false overrides constructor parameter."""
-        with pytest.raises(NotImplementedError) as exc_info:
-            MockInfrastructureContainer(use_mocks=True)
-
-        assert "Real implementations not yet available" in str(exc_info.value)
+        container = MockInfrastructureContainer(use_mocks=True)
+        assert container.use_mocks is False
+        assert container.mode == "real"
+        assert container.initialized is True
 
     @patch.dict(os.environ, {"USE_MOCK_MODE": "yes"})
     def test_environment_override_yes(self):
@@ -70,20 +77,25 @@ class TestMockInfrastructureContainer:
     @patch.dict(os.environ, {"USE_MOCK_MODE": "no"})
     def test_environment_override_no(self):
         """Test that USE_MOCK_MODE=no triggers real implementation."""
-        with pytest.raises(NotImplementedError):
-            MockInfrastructureContainer(use_mocks=True)
+        container = MockInfrastructureContainer(use_mocks=True)
+        assert container.use_mocks is False
+        assert container.mode == "real"
 
     @patch.dict(os.environ, {"USE_MOCK_MODE": "0"})
     def test_environment_override_zero(self):
         """Test that USE_MOCK_MODE=0 triggers real implementation."""
-        with pytest.raises(NotImplementedError):
-            MockInfrastructureContainer(use_mocks=True)
+        container = MockInfrastructureContainer(use_mocks=True)
+        assert container.use_mocks is False
+        assert container.mode == "real"
 
-    @patch.dict(os.environ, {
-        "MOCK_RESPONSE_DELAY_MS": "100",
-        "MOCK_ERROR_RATE": "0.1",
-        "MOCK_DATA_SEED": "123"
-    })
+    @patch.dict(
+        os.environ,
+        {
+            "MOCK_RESPONSE_DELAY_MS": "100",
+            "MOCK_ERROR_RATE": "0.1",
+            "MOCK_DATA_SEED": "123",
+        },
+    )
     def test_mock_configuration_from_environment(self):
         """Test that mock configuration is loaded from environment."""
         container = MockInfrastructureContainer(use_mocks=True)
@@ -101,12 +113,15 @@ class TestMockInfrastructureContainer:
         assert container.mock_data_seed == 42
 
     def test_real_implementation_not_implemented(self):
-        """Test that real implementation raises NotImplementedError."""
-        with pytest.raises(NotImplementedError) as exc_info:
-            MockInfrastructureContainer(use_mocks=False)
-
-        assert "Real implementations not yet available" in str(exc_info.value)
-        assert "USE_MOCK_MODE=true" in str(exc_info.value)
+        """Test that real implementation is now available."""
+        container = MockInfrastructureContainer(use_mocks=False)
+        assert container.use_mocks is False
+        assert container.mode == "real"
+        assert container.initialized is True
+        assert container.get_redis_client() is not None
+        assert container.get_conversation_repository() is not None
+        assert container.get_product_repository() is not None
+        assert container.get_ai_agent() is not None
 
     def test_get_configuration(self):
         """Test that get_configuration returns current settings."""
@@ -123,12 +138,12 @@ class TestMockInfrastructureContainer:
     @patch.dict(os.environ, {"USE_MOCK_MODE": "invalid"})
     def test_invalid_environment_value_uses_constructor(self):
         """Test that invalid USE_MOCK_MODE value defaults to constructor parameter."""
-        # Should use constructor parameter when env value is invalid
         container_true = MockInfrastructureContainer(use_mocks=True)
         assert container_true.use_mocks is True
 
-        with pytest.raises(NotImplementedError):
-            MockInfrastructureContainer(use_mocks=False)
+        container_false = MockInfrastructureContainer(use_mocks=False)
+        assert container_false.use_mocks is False
+        assert container_false.mode == "real"
 
     def test_singleton_behavior(self):
         """Test that services are singletons within a container instance."""

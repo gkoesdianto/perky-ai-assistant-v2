@@ -1,4 +1,4 @@
-"""Tests for use case interfaces using centralized mock implementations from conftest."""
+"""Tests for use case interfaces using centralized mock implementations."""
 
 import pytest
 

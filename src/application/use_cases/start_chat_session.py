@@ -1,10 +1,10 @@
-from typing import Dict, Any
-from datetime import datetime, timezone
 import json
+from datetime import datetime, timezone
+from typing import Any, Dict
 
-from src.domain.entities.session import Session
 from src.application.dto.session_dto import SessionDTO
 from src.application.use_cases.interfaces import StartChatSessionUseCase
+from src.domain.entities.session import Session
 
 
 class StartChatSessionUseCaseImpl(StartChatSessionUseCase):

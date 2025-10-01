@@ -1,11 +1,13 @@
 """
-VariantInfo value object representing a single sellable unit with specific SKU, pricing, and stock information.
-Each variant is a specific configuration of a product that can be sold independently.
+VariantInfo value object representing a single sellable unit with specific
+SKU, pricing, and stock information. Each variant is a specific configuration
+of a product that can be sold independently.
 """
 
 from decimal import Decimal
-from typing import Dict, Any, Literal
-from pydantic import BaseModel, Field, field_validator, ConfigDict
+from typing import Any, Dict, Literal
+
+from pydantic import BaseModel, ConfigDict, Field, field_validator
 
 
 class VariantInfo(BaseModel):
@@ -13,8 +15,9 @@ class VariantInfo(BaseModel):
     Read-only representation of a product variant from PIM.
     Each variant is a specific sellable configuration of a product.
 
-    This value object represents the atomic unit of sale - a specific SKU with its
-    own pricing, stock levels, and specifications (e.g., "Plat Baja 5mm x 1200mm x 2400mm").
+    This value object represents the atomic unit of sale - a specific
+    SKU with its own pricing, stock levels, and specifications
+    (e.g., "Plat Baja 5mm x 1200mm x 2400mm").
     """
 
     model_config = ConfigDict(frozen=True)  # Immutable value object
@@ -24,12 +27,17 @@ class VariantInfo(BaseModel):
     sku: str = Field(..., description="Stock Keeping Unit for inventory management")
     product_id: str = Field(
         ...,
-        description="Parent product identifier linking this variant to its product category",
+        description=(
+            "Parent product identifier linking this variant to its " "product category"
+        ),
     )
 
     # Variant Details
     variant_name: str = Field(
-        ..., description="Variant description (e.g., 'Plat Baja 5mm x 1200mm x 2400mm')"
+        ...,
+        description=(
+            "Variant description " "(e.g., 'Plat Baja 5mm x 1200mm x 2400mm')"
+        ),
     )
 
     # Commerce Information

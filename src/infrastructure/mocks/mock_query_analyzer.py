@@ -1,13 +1,14 @@
 """Mock Query Analyzer for testing and development"""
 
 import re
-from typing import Optional, List, Dict, Any
-from src.application.ports.query_analyzer_port import QueryAnalyzerPort
+from typing import Any, Dict, List, Optional
+
 from src.application.dto.message_dto import MessageDTO
+from src.application.ports.query_analyzer_port import QueryAnalyzerPort
 from src.domain.value_objects.query_intent import (
-    QueryIntent,
-    ConversationContext,
     ClarificationNeeded,
+    ConversationContext,
+    QueryIntent,
 )
 
 

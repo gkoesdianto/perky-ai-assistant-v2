@@ -64,6 +64,14 @@ addopts = [
     "--cov-report=term-missing",
     "--cov-report=html",
 ]
+markers = [
+    "mvp: MVP requirement tests that must pass",
+    "performance: Performance and load tests",
+    "load: Load testing scenarios",
+    "e2e: End-to-end tests",
+    "smoke: Smoke tests for critical paths",
+    "priority: Test priority level (critical, high, medium, low)",
+]
 
 [tool.coverage.run]
 source = ["src"]

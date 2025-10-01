@@ -1,4 +1,4 @@
-from typing import Protocol, Optional, List
+from typing import List, Optional, Protocol
 
 from src.application.dto.message_dto import MessageDTO
 from src.domain.value_objects.query_intent import QueryIntent

@@ -1,9 +1,10 @@
 """WebSocket connection management with SRP."""
 
-from typing import Dict, Optional
-from fastapi import WebSocket
-import logging
 import asyncio
+import logging
+from typing import Dict, Optional
+
+from fastapi import WebSocket
 
 logger = logging.getLogger(__name__)
 
@@ -36,6 +37,17 @@ class ConnectionManager:
                 self.active_connections[connection_id] = websocket
             logger.info(f"Client connected: {connection_id}")
             return True
+        except RuntimeError as e:
+            # TestClient WebSockets are pre-accepted
+            if "WebSocket is already accepted" in str(
+                e
+            ) or "Expected ASGI message" in str(e):
+                async with self._lock:
+                    self.active_connections[connection_id] = websocket
+                logger.info(f"Client connected (TestClient): {connection_id}")
+                return True
+            logger.error(f"Connection failed for {connection_id}: {e}")
+            return False
         except Exception as e:
             logger.error(f"Connection failed for {connection_id}: {e}")
             return False

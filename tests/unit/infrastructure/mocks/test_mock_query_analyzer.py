@@ -5,9 +5,11 @@ query type detection, confidence calculation, and conversational context handlin
 """
 
 import asyncio
+
 import pytest
-from src.infrastructure.mocks.mock_query_analyzer import MockQueryAnalyzer
+
 from src.domain.value_objects.query_intent import QueryIntent
+from src.infrastructure.mocks.mock_query_analyzer import MockQueryAnalyzer
 from tests.factories import DTOFactory
 
 
@@ -25,7 +27,9 @@ def sample_conversation_context():
             content="Saya mencari plat baja", sender_type="user"
         ),
         DTOFactory.create_message_dto(
-            content="Kami memiliki berbagai jenis plat baja. Ukuran apa yang Anda cari?",
+            content=(
+                "Kami memiliki berbagai jenis plat baja. " "Ukuran apa yang Anda cari?"
+            ),
             sender_type="ai_agent",
         ),
     ]
@@ -178,7 +182,8 @@ class TestMockQueryAnalyzer:
         # Should maintain conversation history
         assert len(result.conversation_context.conversation_history) > 0
 
-        # Should increment conversation turn (2 messages = 1 complete turn, next is turn 2)
+        # Should increment conversation turn
+        # (2 messages = 1 complete turn, next is turn 2)
         assert result.conversation_turn == 2  # After one complete exchange
 
     @pytest.mark.asyncio

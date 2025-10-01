@@ -1,7 +1,8 @@
 from typing import List, Optional
-from pydantic_settings import BaseSettings
-from pydantic import AnyHttpUrl, PostgresDsn, RedisDsn, field_validator, ConfigDict
+
+from pydantic import AnyHttpUrl, ConfigDict, PostgresDsn, RedisDsn, field_validator
 from pydantic_core import MultiHostUrl
+from pydantic_settings import BaseSettings
 
 
 class Settings(BaseSettings):
@@ -74,7 +75,9 @@ class Settings(BaseSettings):
     WS_HEARTBEAT_INTERVAL: int
     WS_MAX_CONNECTIONS: int
     WS_MESSAGE_RATE_LIMIT: int
-    WEBSOCKET_HEARTBEAT_INTERVAL: Optional[int] = None  # Alias for WS_HEARTBEAT_INTERVAL
+    WEBSOCKET_HEARTBEAT_INTERVAL: Optional[
+        int
+    ] = None  # Alias for WS_HEARTBEAT_INTERVAL
     MAX_MESSAGES_PER_MINUTE: Optional[int] = None  # Alias for WS_MESSAGE_RATE_LIMIT
 
     # Security
@@ -82,10 +85,7 @@ class Settings(BaseSettings):
     ALGORITHM: str
     ACCESS_TOKEN_EXPIRE_MINUTES: int
 
-    model_config = ConfigDict(
-        env_file=".env",
-        case_sensitive=True
-    )
+    model_config = ConfigDict(env_file=".env", case_sensitive=True)
 
 
 settings = Settings()

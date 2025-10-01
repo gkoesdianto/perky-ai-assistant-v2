@@ -1,10 +1,11 @@
+import os
 import random
 import re
-import os
-from typing import List, Optional, Dict, Any
 from dataclasses import dataclass
-from src.application.ports import AIAgentPort
+from typing import Any, Dict, List, Optional
+
 from src.application.dto import MessageDTO
+from src.application.ports import AIAgentPort
 from src.infrastructure.mocks.mock_error_simulator import MockErrorSimulator
 
 
@@ -17,7 +18,6 @@ class ResponseMetadata:
 
 
 class MockAIAgent(AIAgentPort):
-
     def __init__(self):
         self.last_response_metadata: Optional[ResponseMetadata] = None
 
@@ -67,6 +67,17 @@ class MockAIAgent(AIAgentPort):
         if self._is_product_listing(message):
             return "product_listing"
 
+        # Check stock queries about specific products first
+        # "stok plat ada?" or "stock hollow tersedia?" should be stock_check
+        if self._is_stock_check(message) and self._is_product_inquiry(message):
+            return "stock_check"
+
+        # Check product inquiry before stock check
+        # "Ada plat baja 5mm?" should be product inquiry, not just stock check
+        if self._is_product_inquiry(message):
+            # If asking about specific product with "ada", treat as product inquiry
+            return "product_inquiry"
+
         if self._is_stock_check(message):
             return "stock_check"
 
@@ -75,14 +86,11 @@ class MockAIAgent(AIAgentPort):
             if order_type:
                 return order_type
 
-        if self._is_product_inquiry(message):
-            return "product_inquiry"
-
         return "general"
 
     def _is_greeting(self, message: str) -> bool:
         """Check if message is a greeting."""
-        greeting_pattern = r"\b(halo|hello|hi|hai)\b"
+        greeting_pattern = r"\b(halo|hello|hi|hai|selamat\s+(pagi|siang|sore|malam))\b"
         return bool(re.search(greeting_pattern, message, re.IGNORECASE))
 
     def _is_price_inquiry(self, message: str) -> bool:
@@ -133,7 +141,16 @@ class MockAIAgent(AIAgentPort):
 
     def _is_product_inquiry(self, message: str) -> bool:
         """Check if message is asking about specific products."""
-        product_keywords = ["plat", "hollow", "beam", "pipa"]
+        product_keywords = [
+            "plat",
+            "hollow",
+            "beam",
+            "pipa",
+            "besi",
+            "baja",
+            "steel",
+            "material",
+        ]
         return any(word in message for word in product_keywords)
 
     def _extract_entities(self, message: str) -> Dict[str, Any]:
@@ -220,8 +237,14 @@ class MockAIAgent(AIAgentPort):
             [
                 "Selamat datang di SMS Perkasa! Ada yang bisa saya bantu?",
                 "Halo! Saya PERKY, asisten produk baja Anda. Apa yang Anda cari?",
-                "Selamat datang di SMS Perkasa! Kami siap membantu kebutuhan material baja Anda.",
-                "Halo! Selamat datang di SMS Perkasa. Bagaimana kami bisa membantu Anda hari ini?",
+                (
+                    "Selamat datang di SMS Perkasa! "
+                    "Kami siap membantu kebutuhan material baja Anda."
+                ),
+                (
+                    "Halo! Selamat datang di SMS Perkasa. "
+                    "Bagaimana kami bisa membantu Anda hari ini?"
+                ),
                 "Selamat datang! PERKY di sini, siap membantu kebutuhan baja Anda.",
             ]
         )
@@ -255,6 +278,12 @@ class MockAIAgent(AIAgentPort):
         """Generate price inquiry response."""
         products = entities.get("products", [])
 
+        # If no products in current message, check context
+        if not products and context:
+            product_from_context = self._get_product_from_context(context)
+            if product_from_context:
+                products = [product_from_context]
+
         if "hollow" in products or "40x40" in str(entities.get("dimensions", [])):
             prices = [
                 "Untuk harga hollow galvanis 40x40: Rp 85.000/batang",
@@ -275,7 +304,16 @@ class MockAIAgent(AIAgentPort):
             ]
             base = random.choice(prices)
         else:
-            base = "Harga bervariasi tergantung produk dan spesifikasi"
+            # Provide generic price response with contact info
+            base = random.choice(
+                [
+                    "Untuk informasi harga terbaru, " "silakan hubungi tim sales kami",
+                    "Harga bervariasi tergantung spesifikasi. "
+                    "Hubungi kami untuk penawaran terbaik",
+                    "Kami berikan harga kompetitif. "
+                    "Silakan kontak sales untuk detail",
+                ]
+            )
 
         if random.random() > 0.5:
             extras = [
@@ -317,14 +355,19 @@ class MockAIAgent(AIAgentPort):
 
         if "8mm" in str(thickness):
             responses = [
-                "Ya, untuk plat tebal 8mm kami ada ready stock. Ukuran standar 4x8 feet.",
+                (
+                    "Ya, untuk plat tebal 8mm kami ada ready stock. "
+                    "Ukuran standar 4x8 feet."
+                ),
                 "Plat 8mm tersedia dengan ukuran 1200x2400mm. Ready stock.",
                 "Untuk ketebalan 8mm ada stok. Ukuran standar tersedia.",
             ]
         else:
             responses = [
-                "Kami ada berbagai ukuran dan ketebalan. Spesifikasi apa yang Anda cari?",
-                "Tersedia berbagai dimensi. Silakan sebutkan ukuran yang dibutuhkan.",
+                "Kami ada berbagai ukuran dan ketebalan. "
+                "Spesifikasi apa yang Anda cari?",
+                "Tersedia berbagai dimensi. "
+                "Silakan sebutkan ukuran yang dibutuhkan.",
                 "Ukuran lengkap tersedia. Ada spesifikasi khusus?",
             ]
 
@@ -344,8 +387,8 @@ class MockAIAgent(AIAgentPort):
                 )
             else:
                 return (
-                    "Untuk plat baja, kami memiliki berbagai ketebalan dari 2mm hingga 20mm. "
-                    "Ukuran standar 4x8 feet."
+                    "Untuk plat baja, kami memiliki berbagai ketebalan "
+                    "dari 2mm hingga 20mm. Ukuran standar 4x8 feet."
                 )
 
         elif "hollow" in products:
@@ -355,7 +398,10 @@ class MockAIAgent(AIAgentPort):
             )
 
         elif "beam" in products or "h-beam" in products:
-            return "H-Beam/WF tersedia berbagai ukuran: 100x100, 150x150, 200x200, dll. Semua ready stock."
+            return (
+                "H-Beam/WF tersedia berbagai ukuran: "
+                "100x100, 150x150, 200x200, dll. Semua ready stock."
+            )
 
         else:
             return self._get_product_from_context_response(context)
@@ -369,19 +415,34 @@ class MockAIAgent(AIAgentPort):
         if "hollow" in product_context:
             responses = [
                 "Minimal order hollow adalah 10 batang per ukuran.",
-                "Untuk hollow, minimal pemesanan 10 batang. Ada diskon untuk quantity besar.",
-                "Hollow minimal 10 batang. Kami berikan harga khusus untuk pembelian banyak.",
+                (
+                    "Untuk hollow, minimal pemesanan 10 batang. "
+                    "Ada diskon untuk quantity besar."
+                ),
+                (
+                    "Hollow minimal 10 batang. "
+                    "Kami berikan harga khusus untuk pembelian banyak."
+                ),
             ]
         elif "plat" in product_context:
             responses = [
                 "Minimal order plat baja adalah 5 lembar per ukuran.",
-                "Untuk plat, minimal 5 lembar. Diskon khusus untuk pembelian >20 lembar.",
+                (
+                    "Untuk plat, minimal 5 lembar. "
+                    "Diskon khusus untuk pembelian >20 lembar."
+                ),
                 "Plat minimal pemesanan 5 lembar. Ada program diskon quantity.",
             ]
         else:
             responses = [
-                "Minimal order bervariasi: Plat 5 lembar, Hollow 10 batang, H-Beam 5 batang.",
-                "Setiap produk punya minimal berbeda. Silakan tanyakan untuk produk spesifik.",
+                (
+                    "Minimal order bervariasi: "
+                    "Plat 5 lembar, Hollow 10 batang, H-Beam 5 batang."
+                ),
+                (
+                    "Setiap produk punya minimal berbeda. "
+                    "Silakan tanyakan untuk produk spesifik."
+                ),
                 "Minimal pemesanan tergantung produk. Apa yang ingin Anda pesan?",
             ]
 
@@ -408,9 +469,18 @@ class MockAIAgent(AIAgentPort):
         """Generate order method response."""
         return random.choice(
             [
-                "Untuk pemesanan, Anda bisa hubungi sales kami atau datang langsung ke showroom.",
-                "Cara pesan mudah: hubungi tim sales, kami akan buatkan penawaran sesuai kebutuhan.",
-                "Silakan pesan melalui sales kami. Kami siap membantu proses pemesanan Anda.",
+                (
+                    "Untuk pemesanan, Anda bisa hubungi sales kami "
+                    "atau datang langsung ke showroom."
+                ),
+                (
+                    "Cara pesan mudah: hubungi tim sales, "
+                    "kami akan buatkan penawaran sesuai kebutuhan."
+                ),
+                (
+                    "Silakan pesan melalui sales kami. "
+                    "Kami siap membantu proses pemesanan Anda."
+                ),
             ]
         )
 
@@ -420,9 +490,15 @@ class MockAIAgent(AIAgentPort):
         """Generate order intent response."""
         return random.choice(
             [
-                "Baik, untuk pemesanan silakan konfirmasi spesifikasi dan jumlah yang dibutuhkan.",
+                (
+                    "Baik, untuk pemesanan silakan konfirmasi "
+                    "spesifikasi dan jumlah yang dibutuhkan."
+                ),
                 "Terima kasih atas minatnya. Mari kita diskusikan detail pesanan Anda.",
-                "Siap membantu pemesanan Anda. Mohon informasikan produk dan jumlah yang dibutuhkan.",
+                (
+                    "Siap membantu pemesanan Anda. "
+                    "Mohon informasikan produk dan jumlah yang dibutuhkan."
+                ),
             ]
         )
 
@@ -431,7 +507,7 @@ class MockAIAgent(AIAgentPort):
         return random.choice(
             [
                 "Mohon maaf, bisa dijelaskan lebih detail kebutuhan Anda?",
-                "Saya perlu informasi lebih spesifik. Produk apa yang Anda cari?",
+                ("Saya perlu informasi lebih spesifik. " "Produk apa yang Anda cari?"),
                 "Bisa tolong diperjelas pertanyaan atau kebutuhan Anda?",
             ]
         )
@@ -457,7 +533,10 @@ class MockAIAgent(AIAgentPort):
         product = self._get_product_from_context(context)
 
         if product == "hollow":
-            return "Hollow yang Anda tanyakan tersedia dalam berbagai ukuran. Butuh dimensi berapa?"
+            return (
+                "Hollow yang Anda tanyakan tersedia dalam berbagai ukuran. "
+                "Butuh dimensi berapa?"
+            )
         elif product == "plat":
             return "Plat baja yang dimaksud tersedia. Butuh ketebalan berapa mm?"
         else:
