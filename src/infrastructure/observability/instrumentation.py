@@ -1,6 +1,7 @@
 """Centralized instrumentation setup for all integrations."""
 
 import logging
+from types import ModuleType
 from typing import Optional
 
 import logfire
@@ -9,15 +10,13 @@ from fastapi import FastAPI
 logger = logging.getLogger(__name__)
 
 
-def setup_instrumentation(
-    app: FastAPI, logfire_instance: Optional[logfire.Logfire] = None
-):
+def setup_instrumentation(app: FastAPI, logfire_instance: Optional[ModuleType] = None):
     """
     Set up all Logfire instrumentations.
 
     Args:
         app: FastAPI application instance
-        logfire_instance: Configured Logfire instance (or None if disabled)
+        logfire_instance: Configured logfire module (or None if disabled)
     """
     if not logfire_instance:
         logger.info("Skipping instrumentation (Logfire not configured)")

@@ -1,7 +1,8 @@
 """Logfire configuration and initialization."""
 
 import logging
-from typing import Literal, Optional
+from types import ModuleType
+from typing import Literal, Optional, cast
 
 import logfire
 
@@ -10,12 +11,12 @@ from src.core.config import settings
 logger = logging.getLogger(__name__)
 
 
-def configure_logfire() -> Optional["logfire.Logfire"]:
+def configure_logfire() -> Optional[ModuleType]:
     """
     Configure Logfire with environment-specific settings.
 
     Returns:
-        Configured Logfire instance or None if disabled.
+        Configured logfire module or None if disabled.
     """
     if not settings.LOGFIRE_SEND_TO_LOGFIRE:
         logger.info("Logfire observability disabled (LOGFIRE_SEND_TO_LOGFIRE=false)")
@@ -51,7 +52,7 @@ def configure_logfire() -> Optional["logfire.Logfire"]:
             f"(service={settings.LOGFIRE_SERVICE_NAME})"
         )
 
-        return logfire
+        return cast(ModuleType, logfire)
 
     except Exception as e:
         logger.error(f"Failed to configure Logfire: {e}", exc_info=True)
