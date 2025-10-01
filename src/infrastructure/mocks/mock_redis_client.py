@@ -253,7 +253,7 @@ class MockRedisClient:
 
     # Additional helper methods for testing and debugging
 
-    async def get_json(self, key: str) -> Optional[Union[dict, list]]:
+    async def get_json(self, key: str) -> Optional[Union[dict, list, str]]:
         """
         Get value and automatically deserialize from JSON.
 
@@ -261,15 +261,18 @@ class MockRedisClient:
             key: The key to retrieve
 
         Returns:
-            The deserialized value if it exists, None otherwise
+            The deserialized value if it's JSON, the raw string if not,
+            None if key doesn't exist
         """
         value = await self.get(key)
         if value is None:
             return None
 
         try:
-            return json.loads(value)
+            result: Union[dict, list] = json.loads(value)
+            return result
         except (json.JSONDecodeError, TypeError):
+            # If it's not valid JSON, return the raw string value
             return value
 
     async def info(self) -> Dict[str, Any]:

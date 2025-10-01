@@ -1,8 +1,8 @@
 from typing import List, Literal, Optional
 
-from pydantic import AnyHttpUrl, ConfigDict, PostgresDsn, RedisDsn, field_validator
+from pydantic import AnyHttpUrl, PostgresDsn, RedisDsn, field_validator
 from pydantic_core import MultiHostUrl
-from pydantic_settings import BaseSettings
+from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
 class Settings(BaseSettings):
@@ -107,7 +107,7 @@ class Settings(BaseSettings):
             raise ValueError("LOGFIRE_SAMPLING_RATIO must be between 0.0 and 1.0")
         return v_float
 
-    model_config = ConfigDict(env_file=".env", case_sensitive=True)
+    model_config = SettingsConfigDict(env_file=".env", case_sensitive=True)
 
 
 settings = Settings()

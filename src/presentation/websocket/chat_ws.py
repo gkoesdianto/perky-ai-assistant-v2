@@ -57,11 +57,11 @@ class ChatWebSocket:
         self.session_manager = session_manager or SessionManager()
         self.message_queue = message_queue or MessageQueue()
         self.rate_limiter = rate_limiter or RateLimiter(
-            max_per_minute=settings.MAX_MESSAGES_PER_MINUTE
+            max_per_minute=settings.MAX_MESSAGES_PER_MINUTE or 10
         )
         self.message_validator = message_validator or MessageValidator()
         self.message_rate_limiter = message_rate_limiter or MessageRateLimiter(
-            max_messages_per_minute=settings.MAX_MESSAGES_PER_MINUTE,
+            max_messages_per_minute=settings.MAX_MESSAGES_PER_MINUTE or 10,
             max_messages_per_hour=500,
             max_burst_size=5,
         )
@@ -232,7 +232,7 @@ class ChatWebSocket:
                             else MessageType.AI_RESPONSE.value
                         ),
                         "message": msg.content,
-                        "timestamp": msg.timestamp.isoformat(),
+                        "timestamp": (msg.timestamp or datetime.now()).isoformat(),
                         "metadata": msg.metadata,
                     },
                     connection_id,
@@ -313,7 +313,7 @@ class ChatWebSocket:
             self.last_activity[connection_id] = datetime.now()
         else:
             await self._handle_unknown_message_type(
-                connection_id=connection_id, message_type=message_type
+                connection_id=connection_id, message_type=message_type or "unknown"
             )
 
     async def _process_user_message(
@@ -369,17 +369,23 @@ class ChatWebSocket:
             message.message if message.message else ""
         )
         if not is_valid:
-            await self._send_validation_error(connection_id, error_msg)
+            await self._send_validation_error(
+                connection_id, error_msg or "Invalid message"
+            )
             return
 
         # Check enhanced rate limit
         is_allowed, rate_error = self.message_rate_limiter.is_allowed(connection_id)
         if not is_allowed:
-            await self._send_validation_error(connection_id, rate_error)
+            await self._send_validation_error(
+                connection_id, rate_error or "Rate limit exceeded"
+            )
             return
 
         # Sanitize message for safe display
-        sanitized_message = self.message_validator.sanitize_message(message.message)
+        sanitized_message = self.message_validator.sanitize_message(
+            message.message or ""
+        )
 
         # Send typing indicator
         typing_message = {
@@ -440,7 +446,7 @@ class ChatWebSocket:
                 "type": MessageType.AI_RESPONSE.value,
                 "message": response.content,
                 "metadata": response.metadata,
-                "timestamp": response.timestamp.isoformat(),
+                "timestamp": (response.timestamp or datetime.now()).isoformat(),
             }
 
             # Send to requester

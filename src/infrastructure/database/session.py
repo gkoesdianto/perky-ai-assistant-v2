@@ -5,7 +5,7 @@ from src.core.config import settings
 
 # Create async engine
 engine = create_async_engine(
-    settings.DATABASE_URL.unicode_string(),
+    settings.DATABASE_URL.unicode_string() if settings.DATABASE_URL else "",
     echo=True,
     future=True,
     pool_size=10,

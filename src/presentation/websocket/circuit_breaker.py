@@ -27,7 +27,7 @@ class CircuitBreaker:
         self,
         failure_threshold: int = 3,
         recovery_timeout: int = 60,
-        expected_exception: type = Exception,
+        expected_exception: type[BaseException] = Exception,
     ):
         """
         Initialize circuit breaker.

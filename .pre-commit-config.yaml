@@ -71,6 +71,7 @@ repos:
       - id: bandit
         args: ['-r', 'src/', '-ll']
         exclude: '^tests/'
+        pass_filenames: false
 
 # Global settings
 default_language_version:

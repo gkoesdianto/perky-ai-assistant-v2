@@ -230,7 +230,7 @@ class ChatAgent(AIAgentPort):
 
         logger.info("ChatAgent initialized with PydanticAI")
 
-    def _create_agent(self) -> Agent:
+    def _create_agent(self) -> Agent[ChatDependencies, str]:
         """Create the PydanticAI agent.
 
         Note: OpenAIChatModel uses OPENAI_API_KEY from environment automatically.
@@ -281,7 +281,7 @@ class ChatAgent(AIAgentPort):
                             parts=[
                                 UserPromptPart(
                                     content=msg.content,
-                                    timestamp=msg.timestamp,
+                                    timestamp=msg.timestamp or datetime.now(),
                                 )
                             ]
                         )
@@ -291,7 +291,7 @@ class ChatAgent(AIAgentPort):
                     messages.append(
                         ModelResponse(
                             parts=[TextPart(content=msg.content)],
-                            timestamp=msg.timestamp,
+                            timestamp=msg.timestamp or datetime.now(),
                         )
                     )
             except Exception as e:
@@ -725,9 +725,9 @@ class ChatAgent(AIAgentPort):
             )
 
             # Extract response
-            response = result.data if hasattr(result, "data") else str(result)
+            response_str: str = result.data if hasattr(result, "data") else str(result)
 
-            return response
+            return response_str
 
         except Exception as e:
             logger.error(f"Error generating response: {e}", exc_info=True)
@@ -743,7 +743,7 @@ class ChatAgent(AIAgentPort):
         return MockProductRepository()
 
     @classmethod
-    def create_with_fallback(cls) -> "ChatAgent":
+    def create_with_fallback(cls) -> AIAgentPort:
         """Create a ChatAgent with fallback to mock if API key not available.
 
         Returns:
@@ -757,4 +757,5 @@ class ChatAgent(AIAgentPort):
             )
             from src.infrastructure.mocks.mock_ai_agent import MockAIAgent
 
-            return MockAIAgent()
+            mock_agent: AIAgentPort = MockAIAgent()
+            return mock_agent

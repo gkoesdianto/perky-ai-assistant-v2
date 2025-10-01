@@ -1,7 +1,7 @@
 """Logfire configuration and initialization."""
 
 import logging
-from typing import Optional
+from typing import Literal, Optional
 
 import logfire
 
@@ -10,7 +10,7 @@ from src.core.config import settings
 logger = logging.getLogger(__name__)
 
 
-def configure_logfire() -> Optional[logfire.Logfire]:
+def configure_logfire() -> Optional["logfire.Logfire"]:
     """
     Configure Logfire with environment-specific settings.
 
@@ -30,14 +30,19 @@ def configure_logfire() -> Optional[logfire.Logfire]:
 
     try:
         # Configure scrubbing: use ScrubbingOptions for True, or False to disable
-        scrubbing_config = (
+        scrubbing_config: logfire.ScrubbingOptions | Literal[False] = (
             logfire.ScrubbingOptions() if settings.LOGFIRE_SCRUBBING else False
+        )
+
+        # Configure console: convert bool to ConsoleOptions or False
+        console_config: logfire.ConsoleOptions | Literal[False] = (
+            logfire.ConsoleOptions() if settings.LOGFIRE_CONSOLE else False
         )
 
         logfire.configure(
             token=settings.LOGFIRE_TOKEN,
             service_name=settings.LOGFIRE_SERVICE_NAME,
-            console=settings.LOGFIRE_CONSOLE,
+            console=console_config,
             scrubbing=scrubbing_config,
         )
 
