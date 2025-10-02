@@ -119,11 +119,6 @@ class ChatWebSocket:
 
             # Register connection with session
             await self.session_manager.add_connection(session_id, connection_id)
-            logfire.info(
-                "WebSocket connection established",
-                session_id=session_id,
-                connection_id=connection_id,
-            )
 
             try:
                 # Initialize session
@@ -153,20 +148,9 @@ class ChatWebSocket:
                 )
 
             except WebSocketDisconnect:
-                logfire.info(
-                    "WebSocket disconnected normally",
-                    session_id=session_id,
-                    connection_id=connection_id,
-                )
                 logger.info(f"Client {connection_id} disconnected normally")
 
             except Exception as e:
-                logfire.error(
-                    "WebSocket error",
-                    session_id=session_id,
-                    connection_id=connection_id,
-                    error=str(e),
-                )
                 logger.error(f"WebSocket error for {connection_id}: {e}", exc_info=True)
                 await self._send_error(connection_id, str(e))
 
@@ -282,10 +266,7 @@ class ChatWebSocket:
         while True:
             try:
                 # Receive message
-                with logfire.span(
-                    "websocket.receive_message", connection_id=connection_id
-                ):
-                    raw_data = await websocket.receive_text()
+                raw_data = await websocket.receive_text()
 
                 # Process the received message
                 await self._process_raw_message(
@@ -465,54 +446,35 @@ class ChatWebSocket:
         content = message_data["content"]
         metadata = message_data.get("metadata")
 
-        with logfire.span(
-            "websocket.process_message",
-            connection_id=connection_id,
-            session_id=session_id,
-            message_length=len(content),
-        ):
-            try:
-                # Process message through orchestrator
-                response = await self.chat_orchestrator.handle_user_message(
-                    session_id=session_id, content=content, metadata=metadata
-                )
+        try:
+            # Process message through orchestrator
+            response = await self.chat_orchestrator.handle_user_message(
+                session_id=session_id, content=content, metadata=metadata
+            )
 
-                # Send AI response
-                response_message = {
-                    "type": MessageType.AI_RESPONSE.value,
-                    "message": response.content,
-                    "metadata": response.metadata,
-                    "timestamp": (response.timestamp or datetime.now()).isoformat(),
-                }
+            # Send AI response
+            response_message = {
+                "type": MessageType.AI_RESPONSE.value,
+                "message": response.content,
+                "metadata": response.metadata,
+                "timestamp": (response.timestamp or datetime.now()).isoformat(),
+            }
 
-                with logfire.span("websocket.send_response"):
-                    # Send to requester
-                    await self.send_personal_message(response_message, connection_id)
+            # Send to requester
+            await self.send_personal_message(response_message, connection_id)
 
-                    # Broadcast to session
-                    await self.broadcast_to_session(
-                        response_message,
-                        session_id=session_id,
-                        exclude_connection=connection_id,
-                    )
+            # Broadcast to session
+            await self.broadcast_to_session(
+                response_message,
+                session_id=session_id,
+                exclude_connection=connection_id,
+            )
 
-                logfire.info(
-                    "Message processed and response sent",
-                    session_id=session_id,
-                    response_length=len(response.content) if response.content else 0,
-                )
-
-            except Exception as e:
-                logfire.error(
-                    "Failed to process queued message",
-                    session_id=session_id,
-                    connection_id=connection_id,
-                    error=str(e),
-                )
-                logger.error(f"Failed to process message: {e}", exc_info=True)
-                await self._send_error(
-                    connection_id, "Maaf, terjadi kesalahan. Silakan coba lagi."
-                )
+        except Exception as e:
+            logger.error(f"Failed to process message: {e}", exc_info=True)
+            await self._send_error(
+                connection_id, "Maaf, terjadi kesalahan. Silakan coba lagi."
+            )
 
     async def _handle_ping(self, connection_id: str):
         """
