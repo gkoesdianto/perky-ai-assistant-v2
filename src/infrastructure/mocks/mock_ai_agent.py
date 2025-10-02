@@ -27,7 +27,11 @@ class MockAIAgent(AIAgentPort):
         self.error_simulator = MockErrorSimulator(error_rate, delay_ms)
 
     async def generate_response(
-        self, message: str, conversation_context: Optional[List[MessageDTO]] = None
+        self,
+        message: str,
+        conversation_context: Optional[List[MessageDTO]] = None,
+        product_service: Any = None,
+        session_id: Optional[str] = None,
     ) -> str:
         # Simulate potential errors and delays
         await self.error_simulator.maybe_delay()
