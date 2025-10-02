@@ -724,8 +724,15 @@ class ChatAgent(AIAgentPort):
                 deps=deps,
             )
 
-            # Extract response
-            response_str: str = result.data if hasattr(result, "data") else str(result)
+            # Extract response from PydanticAI AgentRunResult
+            # Note: PydanticAI returns AgentRunResult with .output attribute, not .data
+            response_str: str = (
+                result.output if hasattr(result, "output") else str(result)
+            )
+
+            logger.debug(
+                f"Agent response type: {type(result)}, extracted: {type(response_str)}"
+            )
 
             return response_str
 
