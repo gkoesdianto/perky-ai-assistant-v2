@@ -24,7 +24,9 @@
       "yaml",
       "dockerfile",
       "sql",
-      "env"
+      "env",
+      "mermaid",
+      "html"
     ]
   },
   "MD047": false,
