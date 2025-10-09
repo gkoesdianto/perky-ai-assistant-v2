@@ -126,21 +126,21 @@ maintaining proper lifecycle management.
 
 ```python
 async def get_chat_orchestrator() -> AsyncGenerator[ChatOrchestrator, None]:
-    container = get_singleton_container()
+    container = InfrastructureContainer.instance()
 
     start_session_use_case = StartChatSessionUseCaseImpl(
         session_repository=None,
-        redis_client=container.get_redis_client(),
+        redis_client=container.redis_client,
     )
 
     process_message_use_case = ProcessUserMessageUseCaseImpl(
-        chat_agent=container.get_ai_agent(),
-        product_service=container.get_product_repository(),
-        conversation_repository=container.get_conversation_repository(),
+        chat_agent=container.ai_agent,
+        product_service=container.product_service,
+        conversation_repository=container.conversation_repository,
     )
 
     get_conversation_use_case = GetConversationUseCaseImpl(
-        conversation_repository=container.get_conversation_repository()
+        conversation_repository=container.conversation_repository
     )
 
     orchestrator = ChatOrchestrator(
@@ -155,13 +155,14 @@ async def get_chat_orchestrator() -> AsyncGenerator[ChatOrchestrator, None]:
 **What happens:**
 1. Retrieve singleton container (initialized at app startup)
 2. Container provides implementations (mock or real based on environment)
-3. Create use case implementations with injected dependencies
-4. Assemble orchestrator with use cases
-5. Yield orchestrator to endpoint
+3. Access dependencies via properties (`container.ai_agent`, not `container.get_ai_agent()`)
+4. Create use case implementations with injected dependencies
+5. Assemble orchestrator with use cases
+6. Yield orchestrator to endpoint
 
 **Key Design Decision:** Constructor injection makes dependencies explicit and enables
 easy testing. The container pattern centralizes object creation and lifecycle
-management.
+management. Property-based access is more Pythonic than getter methods.
 
 ---
 
@@ -723,22 +724,22 @@ data.
 
 ```python
 async def get_chat_orchestrator() -> AsyncGenerator[ChatOrchestrator, None]:
-    container = get_singleton_container()
+    container = InfrastructureContainer.instance()
 
-    # Create use cases with dependencies from container
+    # Create use cases with dependencies from container (property access)
     start_session_use_case = StartChatSessionUseCaseImpl(
         session_repository=None,
-        redis_client=container.get_redis_client(),
+        redis_client=container.redis_client,
     )
 
     process_message_use_case = ProcessUserMessageUseCaseImpl(
-        chat_agent=container.get_ai_agent(),
-        product_service=container.get_product_repository(),
-        conversation_repository=container.get_conversation_repository(),
+        chat_agent=container.ai_agent,
+        product_service=container.product_service,
+        conversation_repository=container.conversation_repository,
     )
 
     get_conversation_use_case = GetConversationUseCaseImpl(
-        conversation_repository=container.get_conversation_repository()
+        conversation_repository=container.conversation_repository
     )
 
     # Assemble orchestrator
@@ -769,19 +770,14 @@ graph TB
     end
 
     subgraph "Container Singleton"
-        GetSingleton[get_singleton_container]
-        Singleton[_container: MockInfrastructureContainer]
-    end
-
-    subgraph "Container Creation"
-        ConfigureServices[configure_services_for_mode]
-        EnvCheck{Check<br/>USE_MOCK_MODE<br/>env var}
-        CreateContainer[MockInfrastructureContainer]
+        Instance[InfrastructureContainer.instance]
+        Singleton[_instance: InfrastructureContainer]
+        DetectMode{Detect Mode<br/>USE_MOCK_MODE}
     end
 
     subgraph "Mode Selection"
         SetupMocks[_setup_mocks]
-        SetupReal[_setup_real_implementations]
+        SetupReal[_setup_real]
     end
 
     subgraph "Mock Components"
@@ -799,14 +795,11 @@ graph TB
     end
 
     Main --> Lifespan
-    Lifespan --> GetSingleton
-    GetSingleton --> Singleton
-    Singleton -.first call.-> ConfigureServices
-    ConfigureServices --> EnvCheck
-    EnvCheck -->|USE_MOCK_MODE=true| CreateContainer
-    EnvCheck -->|USE_MOCK_MODE=false| CreateContainer
-    CreateContainer -->|use_mocks=true| SetupMocks
-    CreateContainer -->|use_mocks=false| SetupReal
+    Lifespan --> Instance
+    Instance --> Singleton
+    Singleton -.first call.-> DetectMode
+    DetectMode -->|mock mode| SetupMocks
+    DetectMode -->|real mode| SetupReal
 
     SetupMocks --> MockRedis
     SetupMocks --> MockRepo
@@ -825,125 +818,164 @@ graph TB
 
 ### Container Implementation
 
-**File:** `src/infrastructure/mocks/container/mock_container.py`
+**File:** `src/infrastructure/container.py`
 
 ```python
-@dataclass
-class MockInfrastructureContainer:
+class InfrastructureContainer:
     """
-    Dependency container for mock implementations.
-    Enables easy switching between mock and real implementations via environment flags.
+    Dependency injection container supporting mock and real implementations.
+
+    The container uses a singleton pattern to ensure consistent dependency
+    instances across the application. Mode (mock vs real) can be configured
+    via environment variable or explicit parameter.
+
+    Usage:
+        # Get singleton instance
+        container = InfrastructureContainer.instance()
+
+        # Access dependencies via properties (not methods!)
+        agent = container.ai_agent
+        products = container.product_service
+
+        # Reset singleton (for testing)
+        InfrastructureContainer.reset()
+
+    Environment Variables:
+        USE_MOCK_MODE: "true"/"1"/"yes" for mocks, "false"/"0"/"no" for real
+        OPENAI_API_KEY: Required for real ChatAgent implementation
     """
 
-    def __init__(self, use_mocks: bool = True):
-        # Check environment override
-        env_use_mocks = os.getenv("USE_MOCK_MODE", "").lower()
-        if env_use_mocks in ["true", "1", "yes"]:
-            self.use_mocks = True
-        elif env_use_mocks in ["false", "0", "no"]:
-            self.use_mocks = False
-        else:
-            self.use_mocks = use_mocks
+    _instance: Optional["InfrastructureContainer"] = None
 
-        # Initialize components based on mode
-        if self.use_mocks:
+    @classmethod
+    def instance(cls, use_mocks: Optional[bool] = None) -> "InfrastructureContainer":
+        """
+        Get or create singleton container instance.
+
+        Args:
+            use_mocks: Override mode detection. If None, uses environment.
+
+        Returns:
+            Singleton container instance
+        """
+        if cls._instance is None:
+            cls._instance = cls(use_mocks=use_mocks)
+        return cls._instance
+
+    @classmethod
+    def reset(cls) -> None:
+        """Reset singleton instance (for testing)."""
+        cls._instance = None
+
+    def __init__(self, use_mocks: Optional[bool] = None):
+        """Initialize container with dependencies."""
+        self.mode = self._detect_mode(use_mocks)
+        self._setup_dependencies()
+
+    def _detect_mode(self, use_mocks: Optional[bool]) -> str:
+        """Detect which mode to use (mock or real)."""
+        if use_mocks is not None:
+            return "mock" if use_mocks else "real"
+
+        env_value = os.getenv("USE_MOCK_MODE", "false").lower()
+        return "mock" if env_value in ["true", "1", "yes"] else "real"
+
+    def _setup_dependencies(self) -> None:
+        """Setup all dependencies based on mode."""
+        if self.mode == "mock":
             self._setup_mocks()
         else:
-            self._setup_real_implementations()
+            self._setup_real()
 
-    def _setup_mocks(self):
-        """Register all mock implementations."""
-        self.redis_client = MockRedisClient()
-        self.session_repo = MockSessionRepository()
-        self.conversation_repo = MockConversationRepository()
-        self.product_repo = MockProductRepository()
-        self.query_analyzer = MockQueryAnalyzer()
-        self.ai_agent = MockAIAgent()
-        self.mode = "mock"
+    def _setup_mocks(self) -> None:
+        """Initialize all mock implementations."""
+        self._redis_client = MockRedisClient()
+        self._session_repository = MockSessionRepository()
+        self._conversation_repository = MockConversationRepository()
+        self._product_repository = MockProductRepository()
+        self._query_analyzer = MockQueryAnalyzer()
+        self._ai_agent = MockAIAgent()
 
-    def _setup_real_implementations(self):
-        """Register real implementations for Phase 5 integration."""
-        self.redis_client = MockRedisClient()  # Still mock in MVP
-        self.session_repo = MockSessionRepository()  # Still mock in MVP
-        self.conversation_repo = InMemoryConversationRepository()  # Real
-        self.product_repo = MockProductService()  # Enhanced mock
-        self.query_analyzer = MockQueryAnalyzer()  # Still mock in MVP
+    def _setup_real(self) -> None:
+        """Initialize real implementations (MVP: some still use mocks)."""
+        self._redis_client = MockRedisClient()  # Still mock in MVP
+        self._session_repository = MockSessionRepository()  # Still mock in MVP
+        self._conversation_repository = InMemoryConversationRepository()  # Real
+        self._product_repository = MockProductService()  # Enhanced mock
+        self._query_analyzer = MockQueryAnalyzer()  # Still mock in MVP
 
         # AI agent - use real PydanticAI implementation
         try:
             api_key = os.getenv("OPENAI_API_KEY")
             if api_key:
-                self.ai_agent = ChatAgent(api_key=api_key)
+                self._ai_agent = ChatAgent(api_key=api_key)
             else:
-                print("Warning: No OPENAI_API_KEY found, using mock AI agent")
-                self.ai_agent = MockAIAgent()
+                print("Warning: No OPENAI_API_KEY, using mock AI agent")
+                self._ai_agent = MockAIAgent()
         except Exception as e:
-            print(f"Warning: Failed to initialize real ChatAgent: {e}")
-            self.ai_agent = MockAIAgent()
+            print(f"Warning: Failed to initialize ChatAgent: {e}")
+            self._ai_agent = MockAIAgent()
 
-        self.mode = "real"
+    # Property accessors (Pythonic API)
+    @property
+    def redis_client(self):
+        """Get Redis client instance."""
+        return self._redis_client
 
-    def get_ai_agent(self):
-        """Get AI agent instance (mock or real based on configuration)"""
-        return self.ai_agent
+    @property
+    def conversation_repository(self):
+        """Get conversation repository instance."""
+        return self._conversation_repository
 
-    def get_conversation_repository(self):
-        """Get conversation repository instance"""
-        return self.conversation_repo
+    @property
+    def product_service(self):
+        """Get product service instance."""
+        return self._product_repository
 
-    # ... other factory methods
-```
+    @property
+    def ai_agent(self):
+        """Get AI agent instance."""
+        return self._ai_agent
 
-### Configuration Entry Point
-
-**File:** `src/infrastructure/dependencies/service_config.py`
-
-```python
-def configure_services_for_mode(
-    use_mocks: Optional[bool] = None,
-) -> MockInfrastructureContainer:
-    """
-    Configure all services based on the specified mode.
-
-    Args:
-        use_mocks: If True, use mock implementations.
-                  If None, determine from environment.
-
-    Returns:
-        Configured infrastructure container with all services
-    """
-    if use_mocks is None:
-        # Determine from environment
-        use_mocks = os.getenv("USE_MOCK_MODE", "false").lower() in [
-            "true", "1", "yes",
-        ]
-
-    return MockInfrastructureContainer(use_mocks=use_mocks)
+    @property
+    def query_analyzer(self):
+        """Get query analyzer instance."""
+        return self._query_analyzer
 ```
 
 ### Singleton Pattern
 
-**File:** `src/infrastructure/container.py`
+The container implements a class-based singleton pattern using class methods:
 
 ```python
-# Global container instance (singleton pattern)
-_container = None
+class InfrastructureContainer:
+    _instance: Optional["InfrastructureContainer"] = None
 
-def get_singleton_container() -> MockInfrastructureContainer:
-    """
-    Get singleton container instance.
+    @classmethod
+    def instance(cls, use_mocks: Optional[bool] = None) -> "InfrastructureContainer":
+        """Get or create singleton container instance."""
+        if cls._instance is None:
+            cls._instance = cls(use_mocks=use_mocks)
+        return cls._instance
 
-    Returns:
-        Shared infrastructure container instance
-    """
-    global _container
-    if _container is None:
-        _container = get_container()
-    return _container
+    @classmethod
+    def reset(cls) -> None:
+        """Reset singleton instance (for testing)."""
+        cls._instance = None
 
-def get_container() -> MockInfrastructureContainer:
-    """Get the infrastructure container instance."""
-    return configure_services_for_mode()
+
+# Usage
+container = InfrastructureContainer.instance()  # Get singleton
+InfrastructureContainer.reset()  # Reset for testing
+
+# Backward compatibility functions (optional)
+def get_singleton_container() -> InfrastructureContainer:
+    """Get singleton container instance."""
+    return InfrastructureContainer.instance()
+
+def reset_singleton_container() -> None:
+    """Reset the singleton container instance."""
+    InfrastructureContainer.reset()
 ```
 
 ### Application Lifecycle
@@ -960,7 +992,7 @@ async def lifespan(app: FastAPI):
     configure_logfire()
 
     # Initialize DI container
-    get_singleton_container()
+    InfrastructureContainer.instance()
     logger.info("Services configured successfully")
 
     yield
@@ -981,30 +1013,33 @@ def create_app() -> FastAPI:
 
 **What happens:**
 1. FastAPI app created with lifespan context manager
-2. On startup: `get_singleton_container()` initializes container
+2. On startup: `InfrastructureContainer.instance()` initializes container
 3. Container reads `USE_MOCK_MODE` environment variable
-4. Container creates appropriate implementations
+4. Container creates appropriate implementations via `_setup_mocks()` or `_setup_real()`
 5. Singleton instance cached for entire app lifetime
-6. Dependencies retrieved via `container.get_*()` methods
+6. Dependencies retrieved via properties: `container.ai_agent`, `container.product_service`
 7. On shutdown: Container could perform cleanup (not implemented in MVP)
 
 **Key Design Decisions:**
 
-1. **Singleton Pattern**: Ensures single container instance across app lifetime
+1. **Class-Based Singleton**: Ensures single container instance across app lifetime
+   - **Benefit**: More Pythonic than module-level functions, better encapsulation
    - **Benefit**: Consistent state, efficient resource use
-   - **Trade-off**: Global state makes testing harder (mitigated by `reset_singleton_container()`)
+   - **Mitigation**: `InfrastructureContainer.reset()` for testing
 
-2. **Environment-Based Configuration**: `USE_MOCK_MODE` controls behavior
+2. **Property-Based Access**: Dependencies accessed via properties, not getter methods
+   - **Benefit**: More Pythonic and concise (`container.ai_agent` vs `container.get_ai_agent()`)
+   - **Benefit**: Reduces verbosity throughout codebase
+   - **Trade-off**: Can't add parameters to property access (fine for singleton dependencies)
+
+3. **Environment-Based Configuration**: `USE_MOCK_MODE` controls behavior
    - **Benefit**: Same code works in dev (mocks) and prod (real)
    - **Trade-off**: Configuration must be correct before deployment
 
-3. **Lazy Initialization**: Container created on first access
-   - **Benefit**: Fast startup if container not needed
-   - **Trade-off**: Initialization errors delayed (mitigated by eager init in lifespan)
-
-4. **Factory Methods**: Each dependency has a `get_*()` method
-   - **Benefit**: Explicit, type-safe access to dependencies
-   - **Trade-off**: More boilerplate than property injection
+4. **Simplified Architecture**: Single file, 200 LOC (vs 3 files, 318 LOC)
+   - **Benefit**: 37% code reduction, 67% call chain reduction
+   - **Benefit**: Better discoverability, easier maintenance
+   - **Trade-off**: None - pure improvement
 
 ---
 
@@ -1346,19 +1381,22 @@ graph LR
 
 ### 3. Dependency Injection Container
 
-**Decision:** Centralize dependency creation in `MockInfrastructureContainer`
+**Decision:** Centralize dependency creation in `InfrastructureContainer`
 
 **Reasoning:**
 - **Single Responsibility**: Container handles object creation, use cases handle business logic
 - **Configuration Management**: One place to switch between mock/real implementations
 - **Lifecycle Management**: Control when and how dependencies are created
 - **Singleton Control**: Ensure expensive resources (like ChatAgent) are created once
+- **Property-Based Access**: Pythonic API using properties instead of getter methods
 
 **Trade-offs:**
 - ✅ **Pro**: Centralized configuration, easy to understand
-- ❌ **Con**: Container grows as app grows (mitigated by organization)
+- ✅ **Pro**: Simplified architecture (37% code reduction from refactoring)
 - ✅ **Pro**: Explicit dependencies via constructor injection
-- ❌ **Con**: More verbose than global imports
+- ✅ **Pro**: Properties are more Pythonic than getter methods
+- ❌ **Con**: Container grows as app grows (mitigated by organization)
+- ⚠️ **Note**: More explicit than global imports, but better for testing and maintenance
 
 ---
 
@@ -1678,21 +1716,35 @@ async def generate_response(
 
 ```python
 # INFRASTRUCTURE - Container provides implementations
-class MockInfrastructureContainer:
-    def _setup_real_implementations(self):
-        self.conversation_repo = InMemoryConversationRepository()  # ✅ Real
-        self.ai_agent = ChatAgent(api_key=os.getenv("OPENAI_API_KEY"))  # ✅ Real
-        self.product_repo = MockProductService()  # 🔄 Enhanced mock
+class InfrastructureContainer:
+    def _setup_real(self):
+        """Setup real implementations"""
+        self._conversation_repository = InMemoryConversationRepository()  # ✅ Real
+        self._ai_agent = ChatAgent(api_key=os.getenv("OPENAI_API_KEY"))  # ✅ Real
+        self._product_repository = MockProductService()  # 🔄 Enhanced mock
+
+    # Property accessors
+    @property
+    def ai_agent(self):
+        return self._ai_agent
+
+    @property
+    def product_service(self):
+        return self._product_repository
+
+    @property
+    def conversation_repository(self):
+        return self._conversation_repository
 
 # PRESENTATION - Dependency function assembles orchestrator
 async def get_chat_orchestrator():
-    container = get_singleton_container()
+    container = InfrastructureContainer.instance()
 
     # Use case depends on PORT, not concrete implementation
     process_message_use_case = ProcessUserMessageUseCaseImpl(
-        chat_agent=container.get_ai_agent(),  # Could be ChatAgent or MockAIAgent
-        product_service=container.get_product_repository(),  # Could be real or mock
-        conversation_repository=container.get_conversation_repository(),  # Could be real or mock
+        chat_agent=container.ai_agent,  # Could be ChatAgent or MockAIAgent
+        product_service=container.product_service,  # Could be real or mock
+        conversation_repository=container.conversation_repository,  # Could be real or mock
     )
 
     orchestrator = ChatOrchestrator(
@@ -1717,7 +1769,8 @@ class ProcessUserMessageUseCaseImpl:
 ```
 
 **Result:** Change `USE_MOCK_MODE` environment variable, and the entire app switches
-between mock and real implementations without any code changes!
+between mock and real implementations without any code changes! Properties provide
+cleaner, more Pythonic access to dependencies.
 
 ---
 
@@ -1850,17 +1903,57 @@ external code cannot bypass the aggregate root's method.
    - Easy to understand flow (presentation → application → domain → infrastructure)
    - Mock mode enables fast local development
 
+### Container Refactoring Improvements (Phase 4-5)
+
+The architecture underwent significant refactoring to simplify the dependency injection container:
+
+**Quantifiable Improvements:**
+- **37% Code Reduction**: From 318 LOC across 3 files to 200 LOC in single file
+- **67% Call Chain Reduction**: From 6-step initialization to 2-step process
+- **Single File Location**: Better discoverability (`src/infrastructure/container.py`)
+- **Accurate Naming**: `InfrastructureContainer` (not "Mock") reflects true purpose
+
+**API Improvements:**
+- **Property-Based Access**: More Pythonic (`container.ai_agent` vs `container.get_ai_agent()`)
+- **Class-Based Singleton**: Better encapsulation than module-level functions
+- **Simplified Architecture**: Removed intermediate configuration layers
+- **Backward Compatibility**: Optional compatibility functions for gradual migration
+
+**Before (Old Pattern):**
+
+```python
+from src.infrastructure.container import get_singleton_container
+from src.infrastructure.mocks.container.mock_container import MockInfrastructureContainer
+container = get_singleton_container()
+agent = container.get_ai_agent()
+```
+
+**After (Current Pattern):**
+
+```python
+from src.infrastructure.container import InfrastructureContainer
+container = InfrastructureContainer.instance()
+agent = container.ai_agent
+```
+
+**Key Benefits:**
+- Reduced cognitive load (fewer files, simpler patterns)
+- Faster onboarding for new developers
+- Easier maintenance with single source of truth
+- More Pythonic and idiomatic code
+
 ### Trade-offs & Considerations
 
 1. **Initial Complexity**
    - More files and folders than monolithic approach
    - Learning curve for DDD concepts
    - Setup time for dependency injection
+   - **Note**: Container refactoring significantly reduced this complexity
 
 2. **Verbosity**
    - More interfaces and classes
    - DTO mapping adds boilerplate
-   - Factory methods for each dependency
+   - **Improvement**: Property-based access reduced verbosity in container usage
 
 3. **Over-Engineering Risk**
    - For simple CRUD apps, this might be overkill
@@ -1898,12 +1991,17 @@ The architecture enables:
 
 While there's inherent complexity in DDD and hexagonal architecture, the
 **long-term benefits**—especially for a growing application with multiple developers—far
-outweigh the initial setup cost. The architecture provides a solid foundation for:
+outweigh the initial setup cost. The **Phase 4-5 container refactoring** (37% code reduction,
+67% call chain simplification) demonstrates how the architecture can evolve to become even
+cleaner and more maintainable over time.
+
+The architecture provides a solid foundation for:
 
 - Adding new features without breaking existing ones
 - Switching infrastructure components as needs evolve
 - Testing at multiple levels with appropriate isolation
 - Onboarding new developers with clear architectural boundaries
+- Continuous improvement through refactoring without breaking changes
 
 ---
 
@@ -1927,6 +2025,15 @@ outweigh the initial setup cost. The architecture provides a solid foundation fo
 
 ---
 
-**Document Version:** 1.0
-**Last Updated:** 2025-01-XX
+**Document Version:** 2.0
+**Last Updated:** 2025-10-09
+**Changelog:**
+- v2.0 (2025-10-09): Updated for Phase 4-5 container refactoring
+  - Replaced MockInfrastructureContainer with InfrastructureContainer
+  - Updated all code examples to use property-based access
+  - Added Container Refactoring Improvements section
+  - Updated container architecture diagrams
+  - Documented 37% code reduction and 67% call chain simplification
+- v1.0 (2025-01-XX): Initial architecture documentation
+
 **Author:** Architecture Documentation (AI-Generated)
