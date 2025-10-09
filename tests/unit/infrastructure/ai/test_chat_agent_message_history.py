@@ -182,7 +182,7 @@ async def test_multi_turn_conversation(
 
     # Configure mock to return proper result objects
     mock_result = MagicMock()
-    mock_result.data = "Mock AI response"
+    mock_result.output = "Mock AI response"
     chat_agent.agent.run.return_value = mock_result
 
     # First message
@@ -237,7 +237,7 @@ async def test_three_turn_conversation(
 
     # Configure mock to return proper result objects
     mock_result = MagicMock()
-    mock_result.data = "Mock AI response for turn"
+    mock_result.output = "Mock AI response for turn"
     chat_agent.agent.run.return_value = mock_result
 
     # Turn 1

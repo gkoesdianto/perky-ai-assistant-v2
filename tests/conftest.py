@@ -620,7 +620,13 @@ def chat_agent_with_mocked_llm():
             with patch("src.infrastructure.ai.chat_agent.OpenAIChatModel"):
                 agent = ChatAgent()
                 agent.agent = MagicMock()
-                agent.agent.run = AsyncMock()
+
+                # Create a proper mock result with .output attribute
+                mock_result = MagicMock()
+                mock_result.output = "Saya akan membantu Anda"
+
+                # Configure AsyncMock to return the result
+                agent.agent.run = AsyncMock(return_value=mock_result)
                 return agent
 
 
