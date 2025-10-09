@@ -1,7 +1,7 @@
 """Mock Query Analyzer for testing and development"""
 
 import re
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, List, Literal, Optional
 
 from src.application.dto.message_dto import MessageDTO
 from src.application.ports.query_analyzer_port import QueryAnalyzerPort
@@ -20,7 +20,7 @@ class MockQueryAnalyzer(QueryAnalyzerPort):
 
     def __init__(self):
         # Define pattern dictionaries for query classification
-        self.patterns = {
+        self.patterns: Dict[str, List[str]] = {
             "product_inquiry": [
                 "plat",
                 "hollow",
@@ -138,6 +138,8 @@ class MockQueryAnalyzer(QueryAnalyzerPort):
             conversation_turn=self._get_conversation_turn(conversation_context),
             next_action=next_action,
             next_clarification=next_clarification,
+            suggested_response=None,
+            response_data=None,
             original_query=query,
             current_query=query,
             detected_attributes=detected_attributes,
@@ -147,7 +149,15 @@ class MockQueryAnalyzer(QueryAnalyzerPort):
             quantity=quantity,
         )
 
-    def _detect_query_type(self, query_lower: str) -> str:
+    def _detect_query_type(
+        self, query_lower: str
+    ) -> Literal[
+        "product_inquiry",
+        "availability_check",
+        "price_check",
+        "variant_selection",
+        "general",
+    ]:
         """Detect the type of query based on pattern matching."""
         # Check for specific query types first (more specific patterns)
         # Order matters: check more specific patterns before general ones
@@ -207,7 +217,7 @@ class MockQueryAnalyzer(QueryAnalyzerPort):
 
     def _extract_attributes(self, query_lower: str) -> Dict[str, Any]:
         """Extract product attributes from the query."""
-        attributes = {}
+        attributes: Dict[str, Any] = {}
 
         # Extract product type
         product_type = self._extract_product_type(query_lower)
@@ -247,7 +257,7 @@ class MockQueryAnalyzer(QueryAnalyzerPort):
         # If no compound term found, check individual product types
         for product in self.patterns["product_inquiry"]:
             if product in query_lower:
-                return product
+                return str(product)
 
         return None
 
@@ -295,7 +305,7 @@ class MockQueryAnalyzer(QueryAnalyzerPort):
         confidence: float,
         conversation_context: Optional[List[MessageDTO]],
         detected_attributes: Dict[str, Any],
-    ) -> str:
+    ) -> Literal["initial", "narrowing", "confirming", "complete"]:
         """Determine the clarification stage based on context and confidence."""
         # Count conversation turns
         turn_count = len(conversation_context) if conversation_context else 0
@@ -337,6 +347,7 @@ class MockQueryAnalyzer(QueryAnalyzerPort):
                     question_template="Produk apa yang Anda cari?",
                     options=["plat", "hollow", "besi beton", "pipa", "profil"],
                     priority=1,
+                    depends_on=None,
                 )
             )
 
@@ -363,7 +374,12 @@ class MockQueryAnalyzer(QueryAnalyzerPort):
 
     def _determine_next_action(
         self, clarification_stage: str, confidence: float
-    ) -> str:
+    ) -> Literal[
+        "provide_info",
+        "request_clarification",
+        "suggest_alternatives",
+        "confirm_selection",
+    ]:
         """Determine the next action based on stage and confidence."""
         if clarification_stage == "complete" and confidence >= 0.8:
             return "provide_info"
@@ -402,7 +418,9 @@ class MockQueryAnalyzer(QueryAnalyzerPort):
 
         return None
 
-    def _determine_query_level(self, detected_attributes: Dict[str, Any]) -> str:
+    def _determine_query_level(
+        self, detected_attributes: Dict[str, Any]
+    ) -> Literal["product", "variant", "ambiguous"]:
         """Determine if query is about product or specific variant."""
         # If we have specific dimensions or detailed attributes, it's variant level
         if any(
@@ -434,6 +452,7 @@ class MockQueryAnalyzer(QueryAnalyzerPort):
                 ),
                 options=["plat", "hollow", "besi beton", "pipa", "profil"],
                 priority=1,
+                depends_on=None,
             )
 
         variant_selection = query_type == "variant_selection"

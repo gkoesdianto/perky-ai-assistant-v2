@@ -66,32 +66,26 @@ class ProcessUserMessageUseCaseImpl(ProcessUserMessageUseCase):
             )
 
             # 4. Generate AI response using single agent with tools
-            # The chat_agent can be either a PydanticAI agent or
-            # AIAgentPort implementation
-            if hasattr(self.chat_agent, "run"):
-                # PydanticAI agent pattern
-                response_content = await self.chat_agent.run(
-                    message=content, conversation_context=context
+            # Convert existing messages (before adding new one) to DTOs for context
+            message_dtos = [
+                MessageDTO(
+                    content=msg.content,
+                    sender_type=msg.sender_type,
+                    session_id=session_id,
+                    conversation_id=conversation.id,
+                    timestamp=msg.created_at,
+                    metadata=msg.metadata,
                 )
-            else:
-                # AIAgentPort pattern (for testing/mocking)
-                # Convert existing messages (before adding new one) to DTOs for context
-                message_dtos = [
-                    MessageDTO(
-                        content=msg.content,
-                        sender_type=msg.sender_type,
-                        session_id=session_id,
-                        conversation_id=conversation.id,
-                        timestamp=msg.created_at,
-                        metadata=msg.metadata,
-                    )
-                    for msg in conversation.get_context(limit=4)
-                    # Use same limit as PydanticAI pattern
-                ]
-                response_content = await self.chat_agent.generate_response(
-                    message=content,
-                    conversation_context=message_dtos if message_dtos else None,
-                )
+                for msg in conversation.get_context(limit=4)
+            ]
+
+            # Call generate_response with product_service dependency
+            response_content = await self.chat_agent.generate_response(
+                message=content,
+                conversation_context=message_dtos if message_dtos else None,
+                product_service=self.product_service,
+                session_id=session_id,
+            )
 
             # 5. NOW add the user message to conversation after getting context
             conversation.add_message(user_message)

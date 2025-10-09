@@ -7,6 +7,7 @@ from fastapi.responses import HTMLResponse
 
 from src.core.config import settings
 from src.infrastructure.container import get_singleton_container
+from src.infrastructure.observability import configure_logfire, setup_instrumentation
 from src.presentation.api import health
 from src.presentation.api.v1 import websocket
 
@@ -18,7 +19,12 @@ logger = logging.getLogger(__name__)
 async def lifespan(app: FastAPI):
     """Application lifecycle management"""
     logger.info("Starting Steel Chat MVP application...")
-    get_singleton_container()  # Initialize singleton container
+
+    # Configure Logfire FIRST (before any other services)
+    configure_logfire()
+
+    # Initialize DI container
+    get_singleton_container()
     logger.info("Services configured successfully")
 
     yield
@@ -35,6 +41,10 @@ def create_app() -> FastAPI:
         openapi_url=f"{settings.API_V1_STR}/openapi.json",
         lifespan=lifespan,
     )
+
+    # Set up instrumentation (after app creation, before middleware)
+    logfire_instance = configure_logfire()
+    setup_instrumentation(app, logfire_instance)
 
     app.add_middleware(
         CORSMiddleware,
@@ -76,5 +86,9 @@ if __name__ == "__main__":
     import uvicorn
 
     uvicorn.run(
-        "src.main:app", host="0.0.0.0", port=8000, reload=True, log_level="info"
+        "src.main:app",
+        host="0.0.0.0",  # nosec B104 - Binding to all interfaces for development
+        port=8000,
+        reload=True,
+        log_level="info",
     )

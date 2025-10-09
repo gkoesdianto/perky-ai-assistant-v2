@@ -444,7 +444,7 @@ app = create_app()
 **Add:**
 
 ```text
-logfire[fastapi]==0.53.0  # Or latest version
+logfire[fastapi]==1.3.2
 ```
 
 **Installation:**

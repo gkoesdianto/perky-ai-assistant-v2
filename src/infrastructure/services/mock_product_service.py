@@ -21,7 +21,7 @@ class MockProductService(ProductServicePort):
 
     def __init__(self):
         """Initialize with mock product repository."""
-        self.repository = MockProductRepository()
+        self.repository: MockProductRepository = MockProductRepository()
         self._init_search_index()
 
     def _init_search_index(self):
@@ -90,7 +90,10 @@ class MockProductService(ProductServicePort):
         Returns:
             Product with all variants if found, None otherwise
         """
-        return await self.repository.get_product_with_variants(product_id)
+        result: Optional[
+            ProductWithVariantsInfo
+        ] = await self.repository.get_product_with_variants(product_id)
+        return result
 
     async def get_variant_by_sku(self, sku: str):
         """

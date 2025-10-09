@@ -249,7 +249,7 @@ class TestChatAgentTemplateIntegration:
 
         # Subsequent message should use LLM
         mock_response = MagicMock()
-        mock_response.data = "Saya akan membantu Anda"
+        mock_response.output = "Saya akan membantu Anda"
         chat_agent_with_mocked_llm.agent.run.return_value = mock_response
 
         context = [

@@ -25,7 +25,8 @@ def create_websocket_token(session_id: str) -> str:
         "iat": now,
         "type": "websocket",
     }
-    return jwt.encode(payload, settings.SECRET_KEY, algorithm=settings.ALGORITHM)
+    token: str = jwt.encode(payload, settings.SECRET_KEY, algorithm=settings.ALGORITHM)
+    return token
 
 
 def validate_websocket_token(token: str) -> Optional[str]:
@@ -47,7 +48,8 @@ def validate_websocket_token(token: str) -> Optional[str]:
         if payload.get("type") != "websocket":
             return None
 
-        return payload.get("session_id")
+        session_id: str | None = payload.get("session_id")
+        return session_id
     except JWTError:
         return None
     except Exception:

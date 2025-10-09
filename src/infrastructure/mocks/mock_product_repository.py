@@ -24,7 +24,7 @@ class MockProductRepository(ProductRepository):
     def __init__(self):
         """Initialize with hardcoded Indonesian steel product catalog."""
         self._lock = asyncio.Lock()  # Thread safety for concurrent access
-        self.products = self._create_mock_products()
+        self.products: Dict[str, ProductWithVariantsInfo] = self._create_mock_products()
 
         # Initialize error simulator from environment
         error_rate = float(os.getenv("MOCK_ERROR_RATE", "0.0"))
@@ -913,7 +913,8 @@ class MockProductRepository(ProductRepository):
         Thread-safe implementation with asyncio.Lock.
         """
         async with self._lock:
-            return self.products.get(product_id)
+            result: Optional[ProductWithVariantsInfo] = self.products.get(product_id)
+            return result
 
     async def get_variant_by_sku(self, sku: str) -> Optional[VariantInfo]:
         """
@@ -924,7 +925,8 @@ class MockProductRepository(ProductRepository):
             for product in self.products.values():
                 for variant in product.variants:
                     if variant.sku == sku:
-                        return variant
+                        result_variant: VariantInfo = variant
+                        return result_variant
             return None
 
     async def search_products(self, query: str) -> List[ProductInfo]:
@@ -984,7 +986,8 @@ class MockProductRepository(ProductRepository):
         async with self._lock:
             product_with_variants = self.products.get(product_id)
             if product_with_variants:
-                return product_with_variants.variants
+                variants_list: List[VariantInfo] = product_with_variants.variants
+                return variants_list
             return []
 
     def _normalize_query(self, query: str) -> List[str]:

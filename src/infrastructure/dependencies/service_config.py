@@ -31,7 +31,7 @@ class ServiceConfiguration:
 
     @staticmethod
     def create_infrastructure_container(
-        use_mocks: bool = None,
+        use_mocks: Optional[bool] = None,
     ) -> MockInfrastructureContainer:
         """Create infrastructure container with appropriate mode.
 
@@ -130,7 +130,9 @@ class ServiceConfiguration:
 service_config = ServiceConfiguration()
 
 
-def configure_services_for_mode(use_mocks: bool = None) -> MockInfrastructureContainer:
+def configure_services_for_mode(
+    use_mocks: Optional[bool] = None,
+) -> MockInfrastructureContainer:
     """Configure all services based on the specified mode.
 
     This is the main entry point for service configuration,

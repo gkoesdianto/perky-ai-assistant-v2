@@ -7,6 +7,7 @@ import uuid
 from datetime import datetime
 from typing import Any, Dict, Optional
 
+import logfire
 from fastapi import WebSocket, WebSocketDisconnect
 
 from src.application.services.chat_orchestrator import ChatOrchestrator
@@ -57,11 +58,11 @@ class ChatWebSocket:
         self.session_manager = session_manager or SessionManager()
         self.message_queue = message_queue or MessageQueue()
         self.rate_limiter = rate_limiter or RateLimiter(
-            max_per_minute=settings.MAX_MESSAGES_PER_MINUTE
+            max_per_minute=settings.MAX_MESSAGES_PER_MINUTE or 10
         )
         self.message_validator = message_validator or MessageValidator()
         self.message_rate_limiter = message_rate_limiter or MessageRateLimiter(
-            max_messages_per_minute=settings.MAX_MESSAGES_PER_MINUTE,
+            max_messages_per_minute=settings.MAX_MESSAGES_PER_MINUTE or 10,
             max_messages_per_hour=500,
             max_burst_size=5,
         )
@@ -93,94 +94,104 @@ class ChatWebSocket:
             connection_id = f"{session_id}-{uuid.uuid4().hex[:8]}"
             is_reconnection = False
 
-        # Extract metadata from headers
-        metadata = {
-            "user_agent": websocket.headers.get("user-agent", "unknown"),
-            "origin": websocket.headers.get("origin", "unknown"),
-            "accept_language": websocket.headers.get("accept-language", "en"),
-            "is_reconnection": is_reconnection,
-        }
+        with logfire.span(
+            "websocket.connection",
+            session_id=session_id,
+            connection_id=connection_id,
+            is_reconnection=is_reconnection,
+        ):
+            # Extract metadata from headers
+            metadata = {
+                "user_agent": websocket.headers.get("user-agent", "unknown"),
+                "origin": websocket.headers.get("origin", "unknown"),
+                "accept_language": websocket.headers.get("accept-language", "en"),
+                "is_reconnection": is_reconnection,
+            }
 
-        # Establish connection
-        connected = await self.connection_manager.connect(
-            websocket=websocket, connection_id=connection_id
-        )
-
-        if not connected:
-            await websocket.close(code=1000)
-            return
-
-        # Register connection with session
-        await self.session_manager.add_connection(session_id, connection_id)
-
-        try:
-            # Initialize session
-            await self._handle_connection(
-                connection_id=connection_id, session_id=session_id, metadata=metadata
+            # Establish connection
+            connected = await self.connection_manager.connect(
+                websocket=websocket, connection_id=connection_id
             )
 
-            # Start message queue worker if not already running
-            if not self.message_queue.is_running:
-                await self.message_queue.start_worker(
-                    lambda msg: self._process_queued_message(msg)
+            if not connected:
+                await websocket.close(code=1000)
+                return
+
+            # Register connection with session
+            await self.session_manager.add_connection(session_id, connection_id)
+
+            try:
+                # Initialize session
+                await self._handle_connection(
+                    connection_id=connection_id,
+                    session_id=session_id,
+                    metadata=metadata,
                 )
 
-            # Start background tasks
-            heartbeat_task = asyncio.create_task(
-                self._heartbeat_loop(connection_id, session_id)
-            )
-            health_check_task = asyncio.create_task(self._health_check_loop())
+                # Start message queue worker if not already running
+                if not self.message_queue.is_running:
+                    await self.message_queue.start_worker(
+                        lambda msg: self._process_queued_message(msg)
+                    )
 
-            # Main message loop
-            await self._message_loop(
-                websocket=websocket, connection_id=connection_id, session_id=session_id
-            )
+                # Start background tasks
+                heartbeat_task = asyncio.create_task(
+                    self._heartbeat_loop(connection_id, session_id)
+                )
+                health_check_task = asyncio.create_task(self._health_check_loop())
 
-        except WebSocketDisconnect:
-            logger.info(f"Client {connection_id} disconnected normally")
+                # Main message loop
+                await self._message_loop(
+                    websocket=websocket,
+                    connection_id=connection_id,
+                    session_id=session_id,
+                )
 
-        except Exception as e:
-            logger.error(f"WebSocket error for {connection_id}: {e}", exc_info=True)
-            await self._send_error(connection_id, str(e))
+            except WebSocketDisconnect:
+                logger.info(f"Client {connection_id} disconnected normally")
 
-        finally:
-            # Register disconnection for potential reconnection
-            self.reconnection_manager.register_disconnection(
-                session_id=session_id,
-                connection_id=connection_id,
-                state={
-                    "last_activity": self.last_activity.get(connection_id),
-                    "metadata": metadata,
-                },
-            )
+            except Exception as e:
+                logger.error(f"WebSocket error for {connection_id}: {e}", exc_info=True)
+                await self._send_error(connection_id, str(e))
 
-            # Cleanup tasks
-            if "heartbeat_task" in locals():
-                heartbeat_task.cancel()
-            if "health_check_task" in locals():
-                health_check_task.cancel()
+            finally:
+                # Register disconnection for potential reconnection
+                self.reconnection_manager.register_disconnection(
+                    session_id=session_id,
+                    connection_id=connection_id,
+                    state={
+                        "last_activity": self.last_activity.get(connection_id),
+                        "metadata": metadata,
+                    },
+                )
 
-            # Disconnect client
-            await self.connection_manager.disconnect(connection_id)
-            await self.session_manager.remove_connection(session_id, connection_id)
+                # Cleanup tasks
+                if "heartbeat_task" in locals():
+                    heartbeat_task.cancel()
+                if "health_check_task" in locals():
+                    health_check_task.cancel()
 
-            # Clean up activity tracker and rate limiter
-            if connection_id in self.last_activity:
-                del self.last_activity[connection_id]
+                # Disconnect client
+                await self.connection_manager.disconnect(connection_id)
+                await self.session_manager.remove_connection(session_id, connection_id)
 
-            # Reset rate limits for disconnected connection
-            self.message_rate_limiter.reset_connection(connection_id)
+                # Clean up activity tracker and rate limiter
+                if connection_id in self.last_activity:
+                    del self.last_activity[connection_id]
 
-            # Notify other connections in session about disconnection
-            await self.broadcast_to_session(
-                message={
-                    "type": MessageType.SYSTEM.value,
-                    "event": SystemEvent.DISCONNECTED.value,
-                    "message": f"Koneksi {connection_id[-8:]} terputus",
-                },
-                session_id=session_id,
-                exclude_connection=connection_id,
-            )
+                # Reset rate limits for disconnected connection
+                self.message_rate_limiter.reset_connection(connection_id)
+
+                # Notify other connections in session about disconnection
+                await self.broadcast_to_session(
+                    message={
+                        "type": MessageType.SYSTEM.value,
+                        "event": SystemEvent.DISCONNECTED.value,
+                        "message": f"Koneksi {connection_id[-8:]} terputus",
+                    },
+                    session_id=session_id,
+                    exclude_connection=connection_id,
+                )
 
     async def _handle_connection(
         self, connection_id: str, session_id: str, metadata: dict
@@ -232,7 +243,7 @@ class ChatWebSocket:
                             else MessageType.AI_RESPONSE.value
                         ),
                         "message": msg.content,
-                        "timestamp": msg.timestamp.isoformat(),
+                        "timestamp": (msg.timestamp or datetime.now()).isoformat(),
                         "metadata": msg.metadata,
                     },
                     connection_id,
@@ -313,7 +324,7 @@ class ChatWebSocket:
             self.last_activity[connection_id] = datetime.now()
         else:
             await self._handle_unknown_message_type(
-                connection_id=connection_id, message_type=message_type
+                connection_id=connection_id, message_type=message_type or "unknown"
             )
 
     async def _process_user_message(
@@ -369,17 +380,23 @@ class ChatWebSocket:
             message.message if message.message else ""
         )
         if not is_valid:
-            await self._send_validation_error(connection_id, error_msg)
+            await self._send_validation_error(
+                connection_id, error_msg or "Invalid message"
+            )
             return
 
         # Check enhanced rate limit
         is_allowed, rate_error = self.message_rate_limiter.is_allowed(connection_id)
         if not is_allowed:
-            await self._send_validation_error(connection_id, rate_error)
+            await self._send_validation_error(
+                connection_id, rate_error or "Rate limit exceeded"
+            )
             return
 
         # Sanitize message for safe display
-        sanitized_message = self.message_validator.sanitize_message(message.message)
+        sanitized_message = self.message_validator.sanitize_message(
+            message.message or ""
+        )
 
         # Send typing indicator
         typing_message = {
@@ -440,7 +457,7 @@ class ChatWebSocket:
                 "type": MessageType.AI_RESPONSE.value,
                 "message": response.content,
                 "metadata": response.metadata,
-                "timestamp": response.timestamp.isoformat(),
+                "timestamp": (response.timestamp or datetime.now()).isoformat(),
             }
 
             # Send to requester

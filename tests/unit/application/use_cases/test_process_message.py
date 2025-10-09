@@ -92,13 +92,16 @@ class TestProcessUserMessageUseCaseImpl:
         assert len(mock_ai_agent.last_context) == 2  # Previous 2 messages
 
     @pytest.mark.asyncio
-    async def test_process_message_with_pydantic_agent(
-        self, mock_pydantic_ai_agent, mock_product_service, mock_conversation_repository
+    async def test_process_message_passes_product_service_to_agent(
+        self, mock_ai_agent, mock_product_service, mock_conversation_repository
     ):
-        """Test processing a message with PydanticAI agent."""
+        """Test that product_service is passed to chat agent's generate_response."""
+        # Setup mock AI agent response
+        mock_ai_agent.generate_response.return_value = "Product information provided"
+
         # Arrange
         use_case = ProcessUserMessageUseCaseImpl(
-            chat_agent=mock_pydantic_ai_agent,
+            chat_agent=mock_ai_agent,
             product_service=mock_product_service,
             conversation_repository=mock_conversation_repository,
         )
@@ -109,13 +112,15 @@ class TestProcessUserMessageUseCaseImpl:
         )
 
         # Assert
-        assert result.content == "This is a PydanticAI response"
+        assert result.content == "Product information provided"
         assert result.sender_type == "ai_agent"
 
-        # Verify PydanticAI agent's run method was called
-        mock_pydantic_ai_agent.run.assert_called_once()
-        call_args = mock_pydantic_ai_agent.run.call_args
+        # Verify generate_response was called with product_service and session_id
+        mock_ai_agent.generate_response.assert_called_once()
+        call_args = mock_ai_agent.generate_response.call_args
         assert call_args[1]["message"] == "Show me steel products"
+        assert call_args[1]["product_service"] == mock_product_service
+        assert call_args[1]["session_id"] == "test-session-123"
         assert "conversation_context" in call_args[1]
 
     @pytest.mark.asyncio
