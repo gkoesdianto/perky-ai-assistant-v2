@@ -13,9 +13,7 @@ from src.application.services.chat_orchestrator import ChatOrchestrator
 from src.application.use_cases.get_conversation import GetConversationUseCaseImpl
 from src.application.use_cases.process_message import ProcessUserMessageUseCaseImpl
 from src.application.use_cases.start_chat_session import StartChatSessionUseCaseImpl
-from src.infrastructure.mocks.container.mock_container import (
-    MockInfrastructureContainer,
-)
+from src.infrastructure.container import InfrastructureContainer
 
 
 class TestMockChatFlow:
@@ -24,22 +22,24 @@ class TestMockChatFlow:
     @pytest.fixture
     async def setup_infrastructure(self):
         """Setup mock infrastructure for testing."""
-        container = MockInfrastructureContainer(use_mocks=True)
+        # Reset container for test isolation
+        InfrastructureContainer.reset()
+        container = InfrastructureContainer.instance(use_mocks=True)
 
         # Initialize use cases with mock dependencies
         start_session_use_case = StartChatSessionUseCaseImpl(
             session_repository=None,
-            redis_client=container.get_redis_client(),
+            redis_client=container.redis_client,
         )
 
         process_message_use_case = ProcessUserMessageUseCaseImpl(
-            conversation_repository=container.get_conversation_repository(),
-            chat_agent=container.get_ai_agent(),
-            product_service=container.get_product_repository(),
+            conversation_repository=container.conversation_repository,
+            chat_agent=container.ai_agent,
+            product_service=container.product_service,
         )
 
         get_conversation_use_case = GetConversationUseCaseImpl(
-            conversation_repository=container.get_conversation_repository()
+            conversation_repository=container.conversation_repository
         )
 
         # Create orchestrator with use cases

@@ -109,6 +109,31 @@ fetching from external PIM system.
 
 **Async Throughout**: All database operations, external API calls, and repository methods are async for optimal performance.
 
+**Dependency Injection**: Unified `InfrastructureContainer` manages all infrastructure
+dependencies with singleton pattern. Supports both mock and real implementations via
+environment configuration.
+
+```python
+from src.infrastructure.container import InfrastructureContainer
+
+# Get singleton instance
+container = InfrastructureContainer.instance()
+
+# Access dependencies via properties (not getter methods)
+agent = container.ai_agent
+products = container.product_service
+conversations = container.conversation_repository
+
+# Reset for testing (clears singleton)
+InfrastructureContainer.reset()
+
+# Explicit mode control
+container = InfrastructureContainer.instance(use_mocks=True)  # Force mock mode
+```
+
+Environment variable `USE_MOCK_MODE` controls default mode: "true"/"1"/"yes" for mocks,
+"false"/"0"/"no" for real implementations (default).
+
 ### External Integrations
 
 **PIM System (Perky OS)**: Product catalog data source accessed via HTTP API with
