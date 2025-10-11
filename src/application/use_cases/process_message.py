@@ -48,11 +48,11 @@ class ProcessUserMessageUseCaseImpl(ProcessUserMessageUseCase):
                 )
 
             # 2. Prepare conversation context BEFORE adding new message
-            # (last 4 messages = 2 exchanges)
+            # (last 12 messages = 6 exchanges for context)
             context = {
                 "conversation_history": [
                     {"sender": msg.sender_type, "content": msg.content}
-                    for msg in conversation.get_context(limit=4)
+                    for msg in conversation.get_context(limit=12)
                 ],
                 "session_id": session_id,
             }
@@ -76,7 +76,7 @@ class ProcessUserMessageUseCaseImpl(ProcessUserMessageUseCase):
                     timestamp=msg.created_at,
                     metadata=msg.metadata,
                 )
-                for msg in conversation.get_context(limit=4)
+                for msg in conversation.get_context(limit=12)
             ]
 
             # Call generate_response with product_service dependency

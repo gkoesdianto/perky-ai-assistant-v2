@@ -375,64 +375,134 @@ class ChatWebSocket:
             session_id: Session identifier
             message: WebSocket message
         """
-        # Validate message content
-        is_valid, error_msg = self.message_validator.validate_user_message(
-            message.message if message.message else ""
-        )
-        if not is_valid:
-            await self._send_validation_error(
-                connection_id, error_msg or "Invalid message"
+        try:
+            logger.info(
+                f"Processing message from {connection_id}: "
+                f"{(message.message or '')[:50]}..."
             )
-            return
 
-        # Check enhanced rate limit
-        is_allowed, rate_error = self.message_rate_limiter.is_allowed(connection_id)
-        if not is_allowed:
-            await self._send_validation_error(
-                connection_id, rate_error or "Rate limit exceeded"
+            # Validate message content
+            is_valid, error_msg = self.message_validator.validate_user_message(
+                message.message if message.message else ""
             )
-            return
+            logger.debug(
+                f"Validation result for {connection_id}: "
+                f"valid={is_valid}, error={error_msg}"
+            )
 
-        # Sanitize message for safe display
-        sanitized_message = self.message_validator.sanitize_message(
-            message.message or ""
-        )
+            if not is_valid:
+                logger.warning(f"Validation failed for {connection_id}: {error_msg}")
+                await self._send_validation_error(
+                    connection_id, error_msg or "Invalid message"
+                )
+                return
 
-        # Send typing indicator
-        typing_message = {
-            "type": MessageType.SYSTEM.value,
-            "event": SystemEvent.TYPING.value,
-            "message": "PERKY sedang mengetik...",
-            "timestamp": datetime.now().isoformat(),
-        }
+            # Check enhanced rate limit
+            is_allowed, rate_error = self.message_rate_limiter.is_allowed(connection_id)
+            logger.debug(
+                f"Rate limit check for {connection_id}: "
+                f"allowed={is_allowed}, error={rate_error}"
+            )
 
-        await self.send_personal_message(typing_message, connection_id)
+            if not is_allowed:
+                logger.warning(f"Rate limit exceeded for {connection_id}: {rate_error}")
+                await self._send_validation_error(
+                    connection_id, rate_error or "Rate limit exceeded"
+                )
+                return
 
-        # Broadcast to other connections in session
-        await self.broadcast_to_session(
-            message={
-                "type": MessageType.USER_MESSAGE.value,
-                "message": sanitized_message,
-                "metadata": {"from_connection": connection_id[-8:]},
+            # Check queue health before queueing
+            if self.message_queue.is_full():
+                queue_size = self.message_queue.get_queue_size()
+                logger.error(f"Message queue is full! Size: {queue_size}")
+                await self._send_error(
+                    connection_id,
+                    "Sistem sedang sibuk. Silakan coba lagi dalam beberapa saat.",
+                )
+                return
+
+            # Check if queue worker is running
+            if not self.message_queue.is_running:
+                logger.error(f"Message queue worker is not running for {connection_id}")
+                await self._send_error(
+                    connection_id,
+                    "Sistem sedang dalam pemeliharaan. Silakan coba lagi.",
+                )
+                return
+
+            # Sanitize message for safe display
+            sanitized_message = self.message_validator.sanitize_message(
+                message.message or ""
+            )
+
+            logger.info("Message passed validation, sending typing indicator")
+
+            # Send typing indicator
+            typing_message = {
+                "type": MessageType.SYSTEM.value,
+                "event": SystemEvent.TYPING.value,
+                "message": "PERKY sedang mengetik...",
                 "timestamp": datetime.now().isoformat(),
-            },
-            session_id=session_id,
-            exclude_connection=connection_id,
-        )
+            }
 
-        # Queue message for processing
-        message_data = {
-            "connection_id": connection_id,
-            "session_id": session_id,
-            "content": message.message,
-            "metadata": message.metadata,
-        }
+            await self.send_personal_message(typing_message, connection_id)
 
-        queued = await self.message_queue.add_message(message_data)
-        if not queued:
-            await self._send_error(
-                connection_id, "Sistem sedang sibuk. Silakan coba lagi."
+            # Broadcast to other connections in session
+            await self.broadcast_to_session(
+                message={
+                    "type": MessageType.USER_MESSAGE.value,
+                    "message": sanitized_message,
+                    "metadata": {"from_connection": connection_id[-8:]},
+                    "timestamp": datetime.now().isoformat(),
+                },
+                session_id=session_id,
+                exclude_connection=connection_id,
             )
+
+            # Queue message for processing
+            message_data = {
+                "connection_id": connection_id,
+                "session_id": session_id,
+                "content": message.message,
+                "metadata": message.metadata,
+            }
+
+            logger.info(
+                f"Queueing message for {connection_id}, "
+                f"current queue size: {self.message_queue.get_queue_size()}"
+            )
+
+            queued = await self.message_queue.add_message(message_data)
+            if not queued:
+                logger.error(
+                    f"Failed to queue message for {connection_id}, "
+                    f"queue size: {self.message_queue.get_queue_size()}"
+                )
+                await self._send_error(
+                    connection_id, "Sistem sedang sibuk. Silakan coba lagi."
+                )
+            else:
+                logger.info(
+                    f"Message queued successfully for {connection_id}, "
+                    f"new queue size: {self.message_queue.get_queue_size()}"
+                )
+
+        except Exception as e:
+            logger.error(
+                f"UNEXPECTED ERROR in _handle_user_message for {connection_id}: {e}",
+                exc_info=True,
+            )
+            try:
+                await self._send_error(
+                    connection_id,
+                    "Maaf, terjadi kesalahan dalam memproses pesan Anda. "
+                    "Silakan coba lagi.",
+                )
+            except Exception as send_error:
+                logger.error(
+                    f"Failed to send error message to {connection_id}: {send_error}",
+                    exc_info=True,
+                )
 
     async def _process_queued_message(self, message_data: Dict[str, Any]):
         """
@@ -446,10 +516,20 @@ class ChatWebSocket:
         content = message_data["content"]
         metadata = message_data.get("metadata")
 
+        logger.info(
+            f"Processing queued message for session {session_id}, "
+            f"queue size: {self.message_queue.get_queue_size()}"
+        )
+
         try:
             # Process message through orchestrator
             response = await self.chat_orchestrator.handle_user_message(
                 session_id=session_id, content=content, metadata=metadata
+            )
+
+            logger.info(
+                f"Successfully generated AI response for {connection_id}, "
+                f"response length: {len(response.content)} chars"
             )
 
             # Send AI response
@@ -461,7 +541,14 @@ class ChatWebSocket:
             }
 
             # Send to requester
-            await self.send_personal_message(response_message, connection_id)
+            send_success = await self.send_personal_message(
+                response_message, connection_id
+            )
+            if not send_success:
+                logger.error(
+                    f"Failed to send response to {connection_id}, "
+                    "connection may be closed"
+                )
 
             # Broadcast to session
             await self.broadcast_to_session(
@@ -470,11 +557,26 @@ class ChatWebSocket:
                 exclude_connection=connection_id,
             )
 
-        except Exception as e:
-            logger.error(f"Failed to process message: {e}", exc_info=True)
-            await self._send_error(
-                connection_id, "Maaf, terjadi kesalahan. Silakan coba lagi."
+            logger.info(
+                f"Completed processing for {connection_id}, "
+                f"remaining queue size: {self.message_queue.get_queue_size()}"
             )
+
+        except Exception as e:
+            logger.error(
+                f"Failed to process queued message for {connection_id}: {e}",
+                exc_info=True,
+            )
+            try:
+                await self._send_error(
+                    connection_id, "Maaf, terjadi kesalahan. Silakan coba lagi."
+                )
+            except Exception as send_error:
+                logger.error(
+                    f"Failed to send error message to {connection_id} "
+                    f"after processing failure: {send_error}",
+                    exc_info=True,
+                )
 
     async def _handle_ping(self, connection_id: str):
         """

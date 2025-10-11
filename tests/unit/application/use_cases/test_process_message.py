@@ -159,16 +159,16 @@ class TestProcessUserMessageUseCaseImpl:
         assert result.metadata["error_type"] == "Exception"
 
     @pytest.mark.asyncio
-    async def test_conversation_context_limits_to_4_messages(
+    async def test_conversation_context_limits_to_12_messages(
         self, mock_ai_agent, mock_product_service, mock_conversation_repository
     ):
-        """Test that conversation context is limited to last 4 messages."""
+        """Test that conversation context is limited to last 12 messages."""
         # Setup mock
         mock_ai_agent.generate_response.return_value = "AI response"
 
-        # Arrange - Create conversation with 6 messages
+        # Arrange - Create conversation with 14 messages
         conversation = Conversation(session_id="test-session-123")
-        for i in range(6):
+        for i in range(14):
             sender_type = "user" if i % 2 == 0 else "ai_agent"
             conversation.add_message(
                 Message(
@@ -193,10 +193,10 @@ class TestProcessUserMessageUseCaseImpl:
         assert mock_ai_agent.call_count == 1
         context = mock_ai_agent.last_context
 
-        # Should have last 4 messages from the 6 existing ones
-        assert len(context) == 4
+        # Should have last 12 messages from the 14 existing ones
+        assert len(context) == 12
         assert context[0].content == "Message 2"
-        assert context[-1].content == "Message 5"
+        assert context[-1].content == "Message 13"
 
     @pytest.mark.asyncio
     async def test_metadata_is_preserved_in_messages(

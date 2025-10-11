@@ -1,6 +1,0 @@
-(eval):1: command not found: cloc
-      77 src/infrastructure/container.py
-      17 src/infrastructure/dependencies/__init__.py
-     158 src/infrastructure/dependencies/service_config.py
-     186 src/infrastructure/mocks/container/mock_container.py
-     438 total
