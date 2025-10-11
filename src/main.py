@@ -6,7 +6,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import HTMLResponse
 
 from src.core.config import settings
-from src.infrastructure.container import get_singleton_container
+from src.infrastructure.container import InfrastructureContainer
 from src.infrastructure.observability import configure_logfire, setup_instrumentation
 from src.presentation.api import health
 from src.presentation.api.v1 import websocket
@@ -24,7 +24,7 @@ async def lifespan(app: FastAPI):
     configure_logfire()
 
     # Initialize DI container
-    get_singleton_container()
+    InfrastructureContainer.instance()
     logger.info("Services configured successfully")
 
     yield

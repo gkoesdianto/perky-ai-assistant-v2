@@ -260,7 +260,6 @@ memory/
 # AI Generated Content and Specifications
 # ============================================
 claudedocs/
-ai_specs/
 
 # ============================================
 # Coverage Reports

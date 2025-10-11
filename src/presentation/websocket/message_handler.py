@@ -173,53 +173,101 @@ class MessageRateLimiter:
         Returns:
             Tuple of (is_allowed, rejection_reason)
         """
-        now = datetime.now()
+        try:
+            now = datetime.now()
 
-        # Initialize if new connection
-        if connection_id not in self.message_history:
-            self.message_history[connection_id] = []
-            self.burst_tracker[connection_id] = []
+            # Initialize if new connection
+            if connection_id not in self.message_history:
+                self.message_history[connection_id] = []
+                self.burst_tracker[connection_id] = []
+                logger.debug(
+                    f"Initialized rate tracking for new connection: {connection_id}"
+                )
 
-        # Clean old entries (older than 1 hour)
-        self.message_history[connection_id] = [
-            ts
-            for ts in self.message_history[connection_id]
-            if (now - ts).total_seconds() < 3600
-        ]
+            # Clean old entries (older than 1 hour)
+            self.message_history[connection_id] = [
+                ts
+                for ts in self.message_history[connection_id]
+                if (now - ts).total_seconds() < 3600
+            ]
 
-        history = self.message_history[connection_id]
+            history = self.message_history[connection_id]
 
-        # Check burst limit (messages in last 5 seconds)
-        self.burst_tracker[connection_id] = [
-            ts
-            for ts in self.burst_tracker[connection_id]
-            if (now - ts).total_seconds() < 5
-        ]
+            # Check burst limit (messages in last 5 seconds)
+            self.burst_tracker[connection_id] = [
+                ts
+                for ts in self.burst_tracker[connection_id]
+                if (now - ts).total_seconds() < 5
+            ]
 
-        if len(self.burst_tracker[connection_id]) >= self.max_burst_size:
-            return False, "Terlalu banyak pesan sekaligus. Harap tunggu sebentar."
-
-        # Check per-minute limit
-        recent_minute = [ts for ts in history if (now - ts).total_seconds() < 60]
-
-        if len(recent_minute) >= self.max_per_minute:
-            wait_time = 60 - (now - recent_minute[0]).total_seconds()
-            return (
-                False,
-                f"Batas pesan per menit tercapai. Tunggu {int(wait_time)} detik.",
+            burst_count = len(self.burst_tracker[connection_id])
+            logger.debug(
+                f"Burst check for {connection_id}: "
+                f"{burst_count}/{self.max_burst_size} messages in last 5s"
             )
 
-        # Check per-hour limit
-        if len(history) >= self.max_per_hour:
-            wait_time = 3600 - (now - history[0]).total_seconds()
-            minutes = int(wait_time / 60)
-            return False, f"Batas pesan per jam tercapai. Tunggu {minutes} menit."
+            if burst_count >= self.max_burst_size:
+                logger.warning(
+                    f"Burst limit exceeded for {connection_id}: "
+                    f"{burst_count} messages in 5 seconds"
+                )
+                return False, "Terlalu banyak pesan sekaligus. Harap tunggu sebentar."
 
-        # Record this message
-        self.message_history[connection_id].append(now)
-        self.burst_tracker[connection_id].append(now)
+            # Check per-minute limit
+            recent_minute = [ts for ts in history if (now - ts).total_seconds() < 60]
+            minute_count = len(recent_minute)
+            logger.debug(
+                f"Minute check for {connection_id}: "
+                f"{minute_count}/{self.max_per_minute} messages"
+            )
 
-        return True, None
+            if minute_count >= self.max_per_minute:
+                wait_time = 60 - (now - recent_minute[0]).total_seconds()
+                logger.warning(
+                    f"Per-minute limit exceeded for {connection_id}: "
+                    f"{minute_count} messages"
+                )
+                return (
+                    False,
+                    f"Batas pesan per menit tercapai. Tunggu {int(wait_time)} detik.",
+                )
+
+            # Check per-hour limit
+            hour_count = len(history)
+            logger.debug(
+                f"Hour check for {connection_id}: "
+                f"{hour_count}/{self.max_per_hour} messages"
+            )
+
+            if hour_count >= self.max_per_hour:
+                wait_time = 3600 - (now - history[0]).total_seconds()
+                minutes = int(wait_time / 60)
+                logger.warning(
+                    f"Per-hour limit exceeded for {connection_id}: "
+                    f"{hour_count} messages"
+                )
+                return False, f"Batas pesan per jam tercapai. Tunggu {minutes} menit."
+
+            # Record this message
+            self.message_history[connection_id].append(now)
+            self.burst_tracker[connection_id].append(now)
+
+            logger.debug(
+                f"Rate limit passed for {connection_id}: "
+                f"burst={burst_count+1}/{self.max_burst_size}, "
+                f"minute={minute_count+1}/{self.max_per_minute}, "
+                f"hour={hour_count+1}/{self.max_per_hour}"
+            )
+
+            return True, None
+
+        except Exception as e:
+            logger.error(
+                f"Rate limiter error for {connection_id}: {e}",
+                exc_info=True,
+            )
+            # Fail open with warning - allow the message but log the error
+            return True, None
 
     def get_rate_limit_headers(self, connection_id: str) -> Dict[str, str]:
         """

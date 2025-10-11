@@ -14,7 +14,7 @@ from fastapi import FastAPI
 from fastapi.testclient import TestClient
 from starlette.testclient import WebSocketTestSession
 
-from src.infrastructure.container import reset_singleton_container
+from src.infrastructure.container import InfrastructureContainer
 
 # Import the application
 from src.main import create_app
@@ -35,10 +35,10 @@ def reset_container():
     This fixture runs automatically before each test to clear any state
     that might persist in the singleton container's repositories.
     """
-    reset_singleton_container()
+    InfrastructureContainer.reset()
     yield
     # Optionally reset after test as well for extra safety
-    reset_singleton_container()
+    InfrastructureContainer.reset()
 
 
 @pytest.fixture(scope="function")
@@ -49,7 +49,7 @@ def app() -> FastAPI:
     Scope changed to 'function' to ensure fresh app instance per test.
     """
     # Reset container before creating app
-    reset_singleton_container()
+    InfrastructureContainer.reset()
 
     # Set environment variables before creating the app
     os.environ["USE_MOCK_MODE"] = "true"
@@ -64,7 +64,7 @@ def app() -> FastAPI:
 
     # Reset environment and container
     os.environ.pop("USE_MOCK_MODE", None)
-    reset_singleton_container()
+    InfrastructureContainer.reset()
 
 
 @pytest.fixture

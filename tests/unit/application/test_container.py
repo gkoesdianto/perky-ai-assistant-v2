@@ -24,7 +24,6 @@ class TestApplicationContainer:
 
         assert container.infrastructure is not None
         assert container.infrastructure.mode == "mock"
-        assert container.infrastructure.use_mocks is True
 
     def test_get_redis_client(self):
         """Test that get_redis_client returns MockRedisClient."""
@@ -96,7 +95,6 @@ class TestApplicationContainer:
         """Test that container respects USE_MOCK_MODE environment variable."""
         container = ApplicationContainer()
 
-        assert container.infrastructure.use_mocks is True
         assert container.infrastructure.mode == "mock"
 
     @patch.dict(
@@ -108,28 +106,32 @@ class TestApplicationContainer:
         },
     )
     def test_mock_configuration_propagation(self):
-        """Test that mock configuration is properly propagated from environment."""
+        """Test that container configuration is accessible."""
         container = ApplicationContainer()
         config = container.infrastructure.get_configuration()
 
-        assert config["mock_response_delay_ms"] == 100
-        assert config["mock_error_rate"] == 0.1
-        assert config["mock_data_seed"] == 123
+        # New container returns component types, not mock configuration
+        assert config["mode"] == "mock"
+        assert "components" in config
 
     def test_multiple_containers_share_same_infrastructure_config(self):
-        """Test that multiple container instances can coexist."""
+        """Test that multiple container instances share singleton infrastructure."""
+        # Reset singleton first
+        from src.infrastructure.container import InfrastructureContainer
+
+        InfrastructureContainer.reset()
+
         container1 = ApplicationContainer()
         container2 = ApplicationContainer()
 
-        # Each container has its own infrastructure instance
-        assert container1.infrastructure is not container2.infrastructure
+        # Both containers use the same singleton infrastructure
+        assert container1.infrastructure is container2.infrastructure
 
-        # But they have the same configuration
+        # They have the same configuration
         config1 = container1.infrastructure.get_configuration()
         config2 = container2.infrastructure.get_configuration()
 
         assert config1["mode"] == config2["mode"]
-        assert config1["use_mocks"] == config2["use_mocks"]
 
     def test_all_services_available(self):
         """Test that all expected services are available from the container."""

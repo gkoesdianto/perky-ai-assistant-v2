@@ -3,9 +3,7 @@ Application-level dependency container.
 Integrates with infrastructure layer for dependency injection.
 """
 
-from src.infrastructure.mocks.container.mock_container import (
-    MockInfrastructureContainer,
-)
+from src.infrastructure.container import InfrastructureContainer
 
 
 class ApplicationContainer:
@@ -13,7 +11,7 @@ class ApplicationContainer:
 
     def __init__(self):
         # Initialize infrastructure container
-        self.infrastructure = MockInfrastructureContainer(use_mocks=True)
+        self.infrastructure = InfrastructureContainer.instance(use_mocks=True)
 
         # Wire up application services
         self._setup_services()
@@ -28,20 +26,20 @@ class ApplicationContainer:
 
     def get_redis_client(self):
         """Get Redis client from infrastructure."""
-        return self.infrastructure.get_redis_client()
+        return self.infrastructure.redis_client
 
     def get_conversation_repository(self):
         """Get conversation repository from infrastructure."""
-        return self.infrastructure.get_conversation_repository()
+        return self.infrastructure.conversation_repository
 
     def get_product_repository(self):
         """Get product repository from infrastructure."""
-        return self.infrastructure.get_product_repository()
+        return self.infrastructure.product_service
 
     def get_query_analyzer(self):
         """Get query analyzer from infrastructure."""
-        return self.infrastructure.get_query_analyzer()
+        return self.infrastructure.query_analyzer
 
     def get_ai_agent(self):
         """Get AI agent from infrastructure."""
-        return self.infrastructure.get_ai_agent()
+        return self.infrastructure.ai_agent
